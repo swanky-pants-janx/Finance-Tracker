@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Finance Planner</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-finance">
+
+  <!-- ── Top nav ── -->
+  <nav class="top-nav">
+    <button class="nav-back" onclick="window.location.href='landing-page.html'">← Back</button>
+    <span class="nav-title">Finance Planner</span>
+    <div class="nav-actions">
+      <button class="btn btn-ghost view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">⊞ Table View</button>
+      <button class="btn btn-ghost" onclick="State.signOut()">Sign Out</button>
+    </div>
+  </nav>
+
+  <!-- ── Plan tabs (rendered by JS) ── -->
+  <div class="tab-bar" id="tabBar"></div>
+
+  <!-- ── Board ── -->
+  <div class="finance-board">
+
+    <!-- INCOME COLUMN -->
+    <div class="finance-col" id="incomeCol">
+      <div class="col-header">
+        <div class="col-label income-label">Income</div>
+        <div class="col-total income-total" id="incomeTotal">R 0.00</div>
+        <div class="col-total-sub">after tax</div>
+      </div>
+      <div class="col-scroll" id="incomeScroll"></div>
+    </div>
+
+    <!-- EXPENSE COLUMN -->
+    <div class="finance-col" id="expenseCol">
+      <div class="col-header">
+        <div class="col-label expense-label">Expenses</div>
+        <div class="col-total expense-total" id="expenseTotal">R 0.00</div>
+      </div>
+      <div class="col-scroll" id="expenseScroll"></div>
+    </div>
+
+    <!-- SUMMARY COLUMN -->
+    <div class="finance-col" id="summaryCol">
+      <div class="summary-top col-header">
+        <div class="col-label">Remaining</div>
+        <div class="remaining-amt" id="remainingAmt">R 0.00</div>
+      </div>
+      <div class="summary-bottom">
+        <div id="summaryChartBox">
+          <canvas id="summaryChart"></canvas>
+          <button id="chartModeBtn" class="chart-mode-btn" title="Toggle categories / items view">By category</button>
+        </div>
+        <div id="summaryChartEmpty" class="empty-chart hidden">
+          <div class="empty-chart-icon">🥧</div>
+          <div>Add expense categories<br>to see the breakdown</div>
+        </div>
+        <div class="chart-legend" id="summaryLegend"></div>
+      </div>
+    </div>
+
+  </div><!-- /finance-board -->
+
+  <!-- ── Table view ── -->
+  <div class="table-view hidden" id="tableView">
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <button class="btn btn-ghost table-dl-btn" onclick="downloadTableCSV()">↓ Download CSV</button>
+      </div>
+      <table class="finance-table" id="financeTable">
+        <thead>
+          <tr>
+            <th class="th-type">Type</th>
+            <th class="th-category">Category</th>
+            <th class="th-item">Item</th>
+            <th class="th-amount">Amount</th>
+            <th class="th-pct">% of Income</th>
+          </tr>
+        </thead>
+        <tbody id="financeTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+  <script>
+    /* ════════════════════════════════════════
+       HELPERS
+    ════════════════════════════════════════ */
+    const fmt = State.fmt;
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // Only count non-disabled items; resolves pct-mode items against the active plan
+    function catTotal(cat) {
+      const plan = State.getActivePlan();
+      return cat.items
+        .filter(i => !i.disabled)
+        .reduce((s, i) => s + State.resolveItemAmt(i, plan), 0);
+    }
+
+    // Active plan helpers
+    function getPlan() {
+      const data = State.getData();
+      const plan = data.plans.find(p => p.id === data.activePlanId) || data.plans[0];
+      return { data, plan };
+    }
+    function savePlan(data) { State.saveData(data); }
+
+    /* ════════════════════════════════════════
+       DRAG STATE (category cards)
+    ════════════════════════════════════════ */
+    let dragId = null, dragKind = null;
+
+    /* ════════════════════════════════════════
+       RENDER
+    ════════════════════════════════════════ */
+    function render() {
+      const { data, plan } = getPlan();
+
+      renderTabBar(data);
+
+      // Income: skip disabled categories
+      const incGross = plan.income.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + catTotal(c), 0);
+      const monthlyTax = calcSATax(incGross);
+      const incAfterTax = incGross - monthlyTax;
+      document.getElementById('incomeTotal').textContent = fmt(incAfterTax);
+
+      // Expenses: skip disabled categories
+      const expTotal = plan.expenses.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + catTotal(c), 0);
+      document.getElementById('expenseTotal').textContent = fmt(expTotal);
+
+      // Remaining
+      const remaining = incAfterTax - expTotal;
+      const remEl = document.getElementById('remainingAmt');
+      remEl.textContent = fmt(remaining);
+      remEl.className = 'remaining-amt' + (remaining < 0 ? ' neg' : '');
+
+      // Cards
+      renderCards(plan.income.categories,   'income',  document.getElementById('incomeScroll'));
+      renderCards(plan.expenses.categories, 'expense', document.getElementById('expenseScroll'));
+
+      // Summary chart (only active expense categories)
+      renderSummaryChart(plan.expenses.categories.filter(c => !c.disabled), incAfterTax);
+    }
+
+    /* ── Tab bar ── */
+    function renderTabBar(data) {
+      const bar = document.getElementById('tabBar');
+      bar.innerHTML = '';
+
+      data.plans.forEach(plan => {
+        const isActive = plan.id === data.activePlanId;
+        const chip = document.createElement('div');
+        chip.className = 'tab-chip' + (isActive ? ' active' : '');
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'tab-name';
+        nameSpan.textContent = plan.name;
+        chip.appendChild(nameSpan);
+
+        const dup = document.createElement('button');
+        dup.className = 'tab-dup';
+        dup.title = 'Duplicate plan';
+        dup.textContent = '⧉';
+        dup.addEventListener('click', (e) => { e.stopPropagation(); duplicatePlan(plan.id); });
+        chip.appendChild(dup);
+
+        if (data.plans.length > 1) {
+          const del = document.createElement('button');
+          del.className = 'tab-del';
+          del.title = 'Delete plan';
+          del.textContent = '×';
+          del.addEventListener('click', (e) => { e.stopPropagation(); deletePlan(plan.id); });
+          chip.appendChild(del);
+        }
+
+        chip.addEventListener('click', () => switchPlan(plan.id));
+        nameSpan.addEventListener('dblclick', (e) => { e.stopPropagation(); startRename(plan.id, nameSpan); });
+        bar.appendChild(chip);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'tab-add';
+      addBtn.textContent = '+ New Plan';
+      addBtn.addEventListener('click', addPlan);
+      bar.appendChild(addBtn);
+    }
+
+    function switchPlan(planId) {
+      const data = State.getData();
+      if (data.activePlanId === planId) return;
+      data.activePlanId = planId;
+      savePlan(data);
+      render();
+    }
+
+    function addPlan() {
+      const data = State.getData();
+      const plan = State.newPlan('Plan ' + (data.plans.length + 1));
+      data.plans.push(plan);
+      data.activePlanId = plan.id;
+      savePlan(data);
+      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
+      render();
+    }
+
+    function duplicatePlan(planId) {
+      const data = State.getData();
+      const src  = data.plans.find(p => p.id === planId);
+      if (!src) return;
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id   = 'plan_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+      copy.name = src.name + ' (copy)';
+      // Give all categories and items fresh IDs so references stay consistent within the copy
+      [...copy.income.categories, ...copy.expenses.categories].forEach(cat => {
+        const oldCatId = cat.id;
+        cat.id = State.genId();
+        cat.items.forEach(item => {
+          const oldItemId = item.id;
+          item.id = State.genId();
+          // Fix up intra-plan pct references to point to the new IDs
+          if (item.pctMode) {
+            if (item.refType === 'cat'  && item.refId === oldCatId)  item.refId = cat.id;
+            if (item.refType === 'item' && item.refId === oldItemId) item.refId = item.id;
+          }
+        });
+      });
+      data.plans.splice(data.plans.findIndex(p => p.id === planId) + 1, 0, copy);
+      data.activePlanId = copy.id;
+      savePlan(data);
+      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
+      render();
+    }
+
+    function deletePlan(planId) {
+      const data = State.getData();
+      if (data.plans.length <= 1) return;
+      data.plans = data.plans.filter(p => p.id !== planId);
+      if (data.activePlanId === planId) data.activePlanId = data.plans[0].id;
+      savePlan(data);
+      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
+      render();
+    }
+
+    function startRename(planId, nameSpan) {
+      const current = nameSpan.textContent;
+      const input = document.createElement('input');
+      input.className = 'tab-rename-input';
+      input.value = current;
+      nameSpan.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const commit = () => {
+        const newName = input.value.trim() || current;
+        const data = State.getData();
+        const plan = data.plans.find(p => p.id === planId);
+        if (plan) plan.name = newName;
+        savePlan(data);
+        render();
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') input.blur();
+        if (e.key === 'Escape') { input.value = current; input.blur(); }
+      });
+    }
+
+    /* ── Category cards + inline add ── */
+    function renderCards(cats, kind, container) {
+      container.innerHTML = '';
+      cats.forEach(cat => container.appendChild(makeCard(cat, kind)));
+      container.appendChild(makeAddRow(kind));
+    }
+
+    function makeAddRow(kind) {
+      const wrap = document.createElement('div');
+
+      const btn = document.createElement('button');
+      btn.className = 'add-cat-btn';
+      btn.textContent = '+ Add category';
+      btn.addEventListener('click', () => {
+        wrap.innerHTML = '';
+        wrap.appendChild(makeAddForm(kind, wrap));
+        wrap.querySelector('input').focus();
+      });
+
+      wrap.appendChild(btn);
+      return wrap;
+    }
+
+    function makeAddForm(kind, wrap) {
+      const form = document.createElement('div');
+      form.className = 'add-cat-form';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = kind === 'income' ? 'Category name (e.g. Salary)' : 'Category name (e.g. Rent)';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn btn-primary';
+      saveBtn.textContent = 'Add';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn btn-ghost';
+      cancelBtn.textContent = '✕';
+
+      form.append(input, saveBtn, cancelBtn);
+
+      const save = () => {
+        const name = input.value.trim();
+        if (!name) return;
+        const { data, plan } = getPlan();
+        const arr = kind === 'income' ? plan.income.categories : plan.expenses.categories;
+        arr.push({ id: State.genId(), name, items: [], disabled: false });
+        savePlan(data);
+        render();
+      };
+
+      saveBtn.addEventListener('click', save);
+      cancelBtn.addEventListener('click', () => render());
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') save();
+        if (e.key === 'Escape') render();
+      });
+
+      return form;
+    }
+
+    function makeCard(cat, kind) {
+      const total = catTotal(cat);
+      const el = document.createElement('div');
+      el.className = 'cat-card' + (cat.disabled ? ' is-disabled' : '');
+      el.draggable = true;
+      el.dataset.id = cat.id;
+
+      const toggleIcon = cat.disabled ? '▶' : '⏸';
+      const toggleTitle = cat.disabled ? 'Re-enable category' : 'Disable category';
+
+      el.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <span class="card-name">${esc(cat.name)}</span>
+        <span class="card-amt">${fmt(total)}</span>
+        <button class="card-toggle ${cat.disabled ? 'is-disabled' : ''}" title="${toggleTitle}">${toggleIcon}</button>
+        <button class="card-del" title="Delete">×</button>
+      `;
+
+      // Navigate (not on action buttons)
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.card-del') || e.target.closest('.card-toggle') || e.target.classList.contains('drag-handle')) return;
+        window.location.href = `category-page.html?type=${kind}&id=${cat.id}`;
+      });
+
+      // Toggle disable
+      el.querySelector('.card-toggle').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const { data, plan } = getPlan();
+        const arr = kind === 'income' ? plan.income.categories : plan.expenses.categories;
+        const c = arr.find(x => x.id === cat.id);
+        if (c) c.disabled = !c.disabled;
+        savePlan(data);
+        render();
+      });
+
+      // Delete
+      el.querySelector('.card-del').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const { data, plan } = getPlan();
+        const arr = kind === 'income' ? plan.income.categories : plan.expenses.categories;
+        const idx = arr.findIndex(c => c.id === cat.id);
+        if (idx !== -1) arr.splice(idx, 1);
+        savePlan(data);
+        render();
+      });
+
+      // Drag & drop
+      el.addEventListener('dragstart', (e) => {
+        dragId = cat.id; dragKind = kind;
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => el.classList.add('dragging'));
+      });
+      el.addEventListener('dragend', () => {
+        el.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+        dragId = null; dragKind = null;
+      });
+      el.addEventListener('dragover', e => e.preventDefault());
+      el.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        if (dragId && dragId !== cat.id && dragKind === kind) el.classList.add('drag-over');
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', (e) => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        if (!dragId || dragId === cat.id || dragKind !== kind) return;
+        const { data, plan } = getPlan();
+        const arr = kind === 'income' ? plan.income.categories : plan.expenses.categories;
+        const si = arr.findIndex(c => c.id === dragId);
+        const ti = arr.findIndex(c => c.id === cat.id);
+        const [moved] = arr.splice(si, 1);
+        arr.splice(ti, 0, moved);
+        savePlan(data);
+        render();
+      });
+
+      return el;
+    }
+
+    /* ════════════════════════════════════════
+       SUMMARY CHART
+    ════════════════════════════════════════ */
+    const COLORS = ['#7c6af5','#58a6ff','#f85149','#3fb950','#fb923c','#a78bfa','#38bdf8','#fbbf24','#4ade80','#f472b6'];
+    let summaryChart = null;
+    let chartMode = 'categories'; // 'categories' | 'items'
+
+    const REMAINING_COLOR = '#3d5a80';
+
+    // Called once at init to wire up the toggle button
+    function initChartModeBtn() {
+      document.getElementById('chartModeBtn').addEventListener('click', () => {
+        chartMode = chartMode === 'categories' ? 'items' : 'categories';
+        const { plan } = getPlan();
+        const incGross    = plan.income.categories.filter(c => !c.disabled).reduce((s, c) => s + catTotal(c), 0);
+        const incAfterTax = incGross - calcSATax(incGross);
+        renderSummaryChart(plan.expenses.categories.filter(c => !c.disabled), incAfterTax);
+      });
+    }
+
+    function renderSummaryChart(expCats, incAfterTax) {
+      const active   = expCats.filter(c => catTotal(c) > 0);
+      const totalExp = active.reduce((s, c) => s + catTotal(c), 0);
+      const remaining = Math.max(0, incAfterTax - totalExp);
+
+      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
+
+      document.getElementById('summaryChartBox').classList.remove('hidden');
+      document.getElementById('summaryChartEmpty').classList.add('hidden');
+
+      // Update toggle button label
+      const modeBtn = document.getElementById('chartModeBtn');
+      modeBtn.textContent = chartMode === 'categories' ? 'By category' : 'By items';
+
+      let labels, values, bgColors, clickHandlers;
+
+      if (chartMode === 'categories') {
+        labels       = [...active.map(c => c.name), 'Remaining'];
+        values       = [...active.map(c => catTotal(c)), remaining > 0 ? remaining : 0];
+        bgColors     = [...COLORS.slice(0, active.length), REMAINING_COLOR];
+        clickHandlers = active.map(cat => () => {
+          window.location.href = `category-page.html?type=expense&id=${cat.id}`;
+        });
+      } else {
+        // Flatten all active items across all active expense categories
+        const allItems = [];
+        active.forEach((cat, ci) => {
+          cat.items.filter(i => !i.disabled).forEach(item => {
+            const plan = State.getActivePlan();
+            const amt  = State.resolveItemAmt(item, plan);
+            if (amt > 0) allItems.push({ name: item.name, catName: cat.name, catId: cat.id, amt, catIndex: ci });
+          });
+        });
+        labels       = [...allItems.map(i => i.name), 'Remaining'];
+        values       = [...allItems.map(i => i.amt), remaining > 0 ? remaining : 0];
+        // Shade items by their parent category color for visual grouping
+        bgColors     = [...allItems.map(i => COLORS[i.catIndex % COLORS.length] + 'cc'), REMAINING_COLOR];
+        clickHandlers = allItems.map(item => () => {
+          window.location.href = `category-page.html?type=expense&id=${item.catId}`;
+        });
+      }
+
+      // Placeholder when everything is zero
+      const chartValues = values.every(v => v === 0)
+        ? values.map((_, i) => i === values.length - 1 ? 1 : 0)
+        : values;
+
+      Chart.defaults.color = '#7d8a9e';
+      const chartCanvas = document.getElementById('summaryChart');
+      chartCanvas.style.cursor = 'pointer';
+      summaryChart = new Chart(chartCanvas, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: chartValues,
+            backgroundColor: bgColors,
+            borderColor: '#161b27',
+            borderWidth: 2,
+            hoverOffset: 18
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          cutout: '62%',
+          layout: { padding: 16 },
+          onClick: (event, elements) => {
+            if (elements.length > 0) {
+              const idx = elements[0].index;
+              if (idx < clickHandlers.length) clickHandlers[idx]();
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  if (ctx.label === 'Remaining') {
+                    const pct = incAfterTax > 0 ? ((remaining / incAfterTax) * 100).toFixed(1) : 0;
+                    return ` ${fmt(remaining)}  (${pct}% of income)`;
+                  }
+                  const pct = incAfterTax > 0 ? ((ctx.raw / incAfterTax) * 100).toFixed(1) : 0;
+                  return ` ${fmt(ctx.raw)}  (${pct}% of income)`;
+                },
+                title: (ctx) => {
+                  const label = ctx[0].label;
+                  if (label === 'Remaining') return label;
+                  if (chartMode === 'items') {
+                    // Show "Item · Category" in the tooltip header
+                    const item = (chartMode === 'items'
+                      ? active.flatMap(cat => cat.items.filter(i => !i.disabled).map(i => ({ name: i.name, catName: cat.name })))
+                      : []
+                    ).find(i => i.name === label);
+                    return item ? `${label}  ·  ${item.catName}` : `${label} — click to view`;
+                  }
+                  return `${label} — click to view`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Legend
+      const legend = document.getElementById('summaryLegend');
+      legend.innerHTML = '';
+
+      if (chartMode === 'categories') {
+        active.forEach((cat, i) => {
+          const t   = catTotal(cat);
+          const pct = incAfterTax > 0 ? ((t / incAfterTax) * 100).toFixed(1) : 0;
+          const el  = document.createElement('div');
+          el.className   = 'leg-item';
+          el.style.cursor = 'pointer';
+          el.title = 'Click to view category';
+          el.innerHTML = `
+            <div class="leg-dot" style="background:${COLORS[i % COLORS.length]}"></div>
+            <span class="leg-name">${esc(cat.name)}</span>
+            <span class="leg-pct">${pct}%</span>
+          `;
+          el.addEventListener('click', () => {
+            window.location.href = `category-page.html?type=expense&id=${cat.id}`;
+          });
+          legend.appendChild(el);
+        });
+      } else {
+        // Group legend by category, show items underneath
+        active.forEach((cat, ci) => {
+          const catItems = cat.items.filter(i => !i.disabled).filter(i => {
+            const plan = State.getActivePlan();
+            return State.resolveItemAmt(i, plan) > 0;
+          });
+          if (!catItems.length) return;
+
+          const header = document.createElement('div');
+          header.className = 'leg-item leg-group-header';
+          header.innerHTML = `
+            <div class="leg-dot" style="background:${COLORS[ci % COLORS.length]}"></div>
+            <span class="leg-name" style="color:var(--text);font-weight:600">${esc(cat.name)}</span>
+          `;
+          legend.appendChild(header);
+
+          catItems.forEach(item => {
+            const plan = State.getActivePlan();
+            const amt  = State.resolveItemAmt(item, plan);
+            const pct  = incAfterTax > 0 ? ((amt / incAfterTax) * 100).toFixed(1) : 0;
+            const el   = document.createElement('div');
+            el.className    = 'leg-item leg-sub-item';
+            el.style.cursor = 'pointer';
+            el.title = 'Click to view category';
+            el.innerHTML = `
+              <div class="leg-dot" style="background:${COLORS[ci % COLORS.length]}88;width:6px;height:6px"></div>
+              <span class="leg-name">${esc(item.name)}</span>
+              <span class="leg-pct">${pct}%</span>
+            `;
+            el.addEventListener('click', () => {
+              window.location.href = `category-page.html?type=expense&id=${cat.id}`;
+            });
+            legend.appendChild(el);
+          });
+        });
+      }
+
+      // Remaining row — always shown
+      const remPct = incAfterTax > 0 ? ((remaining / incAfterTax) * 100).toFixed(1) : 0;
+      const remEl  = document.createElement('div');
+      remEl.className = 'leg-item';
+      remEl.innerHTML = `
+        <div class="leg-dot" style="background:${REMAINING_COLOR}"></div>
+        <span class="leg-name">Remaining</span>
+        <span class="leg-pct">${remPct}%</span>
+      `;
+      legend.appendChild(remEl);
+    }
+
+    /* ════════════════════════════════════════
+       COLUMN RESIZER
+    ════════════════════════════════════════ */
+
+
+    /* ════════════════════════════════════════
+       TABLE VIEW
+    ════════════════════════════════════════ */
+    let tableViewActive = false;
+
+    function toggleView() {
+      tableViewActive = !tableViewActive;
+      const btn = document.getElementById('viewToggleBtn');
+      const board = document.querySelector('.finance-board');
+      const tableView = document.getElementById('tableView');
+      if (tableViewActive) {
+        board.classList.add('hidden');
+        tableView.classList.remove('hidden');
+        buildTableView();
+        btn.textContent = '⊟ Board View';
+      } else {
+        board.classList.remove('hidden');
+        tableView.classList.add('hidden');
+        btn.textContent = '⊞ Table View';
+      }
+    }
+
+    function buildTableView() {
+      const { data, plan } = getPlan();
+      const tbody = document.getElementById('financeTableBody');
+      tbody.innerHTML = '';
+
+      const incGross = plan.income.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + catTotal(c), 0);
+      const monthlyTax = calcSATax(incGross);
+      const incAfterTax = incGross - monthlyTax;
+
+      const pct = (amt) => incAfterTax > 0 ? ((amt / incAfterTax) * 100).toFixed(1) + '%' : '—';
+
+      function addRow(cells, cls) {
+        const tr = document.createElement('tr');
+        if (cls) tr.className = cls;
+        cells.forEach(({ text, cls: tdCls, colspan }) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          if (tdCls) td.className = tdCls;
+          if (colspan) td.colSpan = colspan;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      }
+
+      // ── INCOME ──
+      addRow([{ text: 'Income', colspan: 5 }], 'tr-section tr-income-section');
+
+      plan.income.categories.forEach(cat => {
+        if (cat.disabled) return;
+        const total = catTotal(cat);
+        addRow([
+          { text: '', cls: 'td-type' },
+          { text: cat.name, cls: 'td-category income-cat' },
+          { text: '' },
+          { text: fmt(total), cls: 'td-amount' },
+          { text: '' }
+        ], 'tr-category');
+
+        cat.items.filter(i => !i.disabled).forEach(item => {
+          const amt = State.resolveItemAmt(item, plan);
+          addRow([
+            { text: '', cls: 'td-type' },
+            { text: '' },
+            { text: item.name, cls: 'td-item' },
+            { text: fmt(amt), cls: 'td-amount' },
+            { text: '' }
+          ], 'tr-item');
+        });
+      });
+
+      // Gross & tax rows
+      addRow([
+        { text: '', cls: 'td-type' },
+        { text: 'Gross Income', cls: 'td-subtotal', colspan: 2 },
+        { text: fmt(incGross), cls: 'td-amount td-subtotal' },
+        { text: '' }
+      ], 'tr-subtotal');
+      addRow([
+        { text: '', cls: 'td-type' },
+        { text: 'PAYE Tax', cls: 'td-tax', colspan: 2 },
+        { text: '− ' + fmt(monthlyTax), cls: 'td-amount td-tax' },
+        { text: '' }
+      ], 'tr-tax');
+      addRow([
+        { text: 'After-Tax Income', cls: 'td-total td-income-total', colspan: 3 },
+        { text: fmt(incAfterTax), cls: 'td-amount td-total td-income-total' },
+        { text: '' }
+      ], 'tr-total tr-income-total');
+
+      // ── EXPENSES ──
+      addRow([{ text: 'Expenses', colspan: 5 }], 'tr-section tr-expense-section');
+
+      let expTotal = 0;
+      plan.expenses.categories.forEach(cat => {
+        if (cat.disabled) return;
+        const total = catTotal(cat);
+        expTotal += total;
+        addRow([
+          { text: '', cls: 'td-type' },
+          { text: cat.name, cls: 'td-category expense-cat' },
+          { text: '' },
+          { text: fmt(total), cls: 'td-amount' },
+          { text: pct(total), cls: 'td-pct' }
+        ], 'tr-category');
+
+        cat.items.filter(i => !i.disabled).forEach(item => {
+          const amt = State.resolveItemAmt(item, plan);
+          addRow([
+            { text: '', cls: 'td-type' },
+            { text: '' },
+            { text: item.name, cls: 'td-item' },
+            { text: fmt(amt), cls: 'td-amount' },
+            { text: pct(amt), cls: 'td-pct' }
+          ], 'tr-item');
+        });
+      });
+
+      addRow([
+        { text: 'Total Expenses', cls: 'td-total td-expense-total', colspan: 3 },
+        { text: fmt(expTotal), cls: 'td-amount td-total td-expense-total' },
+        { text: pct(expTotal), cls: 'td-pct td-total' }
+      ], 'tr-total tr-expense-total');
+
+      // ── REMAINING ──
+      const remaining = incAfterTax - expTotal;
+      addRow([
+        { text: 'Remaining', cls: 'td-remaining', colspan: 3 },
+        { text: fmt(remaining), cls: 'td-amount td-remaining' + (remaining < 0 ? ' td-neg' : '') },
+        { text: incAfterTax > 0 ? ((remaining / incAfterTax) * 100).toFixed(1) + '%' : '—', cls: 'td-pct td-remaining' }
+      ], 'tr-remaining');
+    }
+
+    /* ════════════════════════════════════════
+       DOWNLOAD CSV
+    ════════════════════════════════════════ */
+    function downloadTableCSV() {
+      const { data, plan } = getPlan();
+      const rows = [['Type', 'Category', 'Item', 'Amount', '% of Income']];
+
+      const incGross = plan.income.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + catTotal(c), 0);
+      const monthlyTax = calcSATax(incGross);
+      const incAfterTax = incGross - monthlyTax;
+      const pct = (amt) => incAfterTax > 0 ? ((amt / incAfterTax) * 100).toFixed(1) + '%' : '';
+
+      // Income
+      plan.income.categories.forEach(cat => {
+        if (cat.disabled) return;
+        rows.push(['Income', cat.name, '', fmt(catTotal(cat)), '']);
+        cat.items.filter(i => !i.disabled).forEach(item => {
+          rows.push(['Income', cat.name, item.name, fmt(State.resolveItemAmt(item, plan)), '']);
+        });
+      });
+      rows.push(['Income', 'Gross Income', '', fmt(incGross), '']);
+      rows.push(['Income', 'PAYE Tax', '', '-' + fmt(monthlyTax), '']);
+      rows.push(['Income', 'After-Tax Income', '', fmt(incAfterTax), '']);
+
+      // Expenses
+      let expTotal = 0;
+      plan.expenses.categories.forEach(cat => {
+        if (cat.disabled) return;
+        const total = catTotal(cat);
+        expTotal += total;
+        rows.push(['Expense', cat.name, '', fmt(total), pct(total)]);
+        cat.items.filter(i => !i.disabled).forEach(item => {
+          const amt = State.resolveItemAmt(item, plan);
+          rows.push(['Expense', cat.name, item.name, fmt(amt), pct(amt)]);
+        });
+      });
+      rows.push(['Expense', 'Total Expenses', '', fmt(expTotal), pct(expTotal)]);
+
+      // Remaining
+      const remaining = incAfterTax - expTotal;
+      rows.push(['Remaining', '', '', fmt(remaining), pct(remaining)]);
+
+      const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${plan.name.replace(/\s+/g, '_')}_finance.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /* ════════════════════════════════════════
+       INIT
+    ════════════════════════════════════════ */
+    document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      render();
+      initChartModeBtn();
+    });
+  </script>
+</body>
+</html>

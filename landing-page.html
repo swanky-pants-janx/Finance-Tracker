@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Home</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-landing">
+
+  <div class="landing-wrap">
+    <div class="landing-topbar">
+      <button class="btn btn-ghost btn-sm" onclick="State.signOut()">Sign Out</button>
+    </div>
+    <div class="greeting">
+      <h1>Hello, <span class="name-highlight" id="userName">there</span></h1>
+      <p>What would you like to work on today?</p>
+    </div>
+
+    <div class="apps-row">
+      <a class="app-tile" href="finance-app.html">
+        <div class="tile-icon finance">💰</div>
+        <span class="tile-label">Finance<br>Planner</span>
+      </a>
+
+      <a class="app-tile" href="savings-planner.html">
+        <div class="tile-icon savings">🏦</div>
+        <span class="tile-label">Savings<br>Planner</span>
+      </a>
+
+      <div class="app-tile locked">
+        <div class="tile-icon reports">📊</div>
+        <span class="tile-label">Reports</span>
+        <span class="tile-badge">Soon</span>
+      </div>
+
+      <div class="app-tile locked">
+        <div class="tile-icon budget">💳</div>
+        <span class="tile-label">Budget</span>
+        <span class="tile-badge">Soon</span>
+      </div>
+
+      <div class="app-tile locked">
+        <div class="tile-icon goals">🎯</div>
+        <span class="tile-label">Goals</span>
+        <span class="tile-badge">Soon</span>
+      </div>
+
+      <div class="app-tile locked">
+        <div class="tile-icon settings">⚙️</div>
+        <span class="tile-label">Settings</span>
+        <span class="tile-badge">Soon</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    (async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      document.getElementById('userName').textContent = State.getUser();
+    })();
+  </script>
+</body>
+</html>

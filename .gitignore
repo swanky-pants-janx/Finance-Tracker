@@ -1,0 +1,15 @@
+# Supabase keys — never commit real keys
+supabase-config.js
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Env files
+.env
+.env.local
+.env*.local

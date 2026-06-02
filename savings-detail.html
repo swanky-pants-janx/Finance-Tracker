@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Savings Goal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-category">
+
+  <nav class="top-nav">
+    <button class="nav-back" onclick="window.location.href='savings-planner.html'">← Back</button>
+    <span class="nav-title" id="navTitle">Savings Goal</span>
+    <span class="nav-tag income" id="navPct"></span>
+  </nav>
+
+  <div class="cat-content">
+
+    <!-- Left: progress display -->
+    <div class="items-panel">
+      <div class="items-head">
+        <span class="items-head-title">Progress</span>
+        <span class="items-total-val income" id="currentDisplay">R 0.00</span>
+      </div>
+      <div class="items-scroll" id="progressScroll"></div>
+    </div>
+
+    <div class="col-resizer" id="panelResizer"></div>
+
+    <!-- Right: settings -->
+    <div class="chart-side" id="settingsSide">
+      <div class="chart-title">Goal Settings</div>
+
+      <div class="sp-settings-form">
+        <div class="field-group">
+          <label>Goal Name</label>
+          <input type="text" id="fName" placeholder="e.g. Emergency Fund">
+        </div>
+        <div class="field-group">
+          <label>Current Savings (R)</label>
+          <input type="number" id="fCurrent" placeholder="0" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label>Target Goal (R)</label>
+          <input type="number" id="fGoal" placeholder="0" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label>Monthly Contribution (R)</label>
+          <input type="number" id="fMonthly" placeholder="0" min="0" step="0.01">
+        </div>
+        <button class="btn btn-primary btn-full" id="saveBtn">Save Changes</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    function getPlans() { return State.getSavings(); }
+    function savePlans(p) { State.saveSavings(p); }
+
+    function getId() {
+      return new URLSearchParams(window.location.search).get('id');
+    }
+
+    function getPlan() {
+      return getPlans().find(p => p.id === getId());
+    }
+
+    function fmt(n) {
+      return 'R ' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pct(current, goal) {
+      if (!goal || goal <= 0) return 0;
+      return Math.min(100, Math.round((current / goal) * 100));
+    }
+
+    function progressColor(p) {
+      if (p < 40) return 'var(--expense)';
+      if (p < 75) return '#f0a541';
+      return 'var(--income)';
+    }
+
+    function monthsToGoal(current, goal, monthly) {
+      if (monthly <= 0 || current >= goal) return null;
+      return Math.ceil((goal - current) / monthly);
+    }
+
+    function formatDuration(months) {
+      if (months === null) return null;
+      const y = Math.floor(months / 12);
+      const m = months % 12;
+      const parts = [];
+      if (y) parts.push(y + (y === 1 ? ' year' : ' years'));
+      if (m) parts.push(m + (m === 1 ? ' month' : ' months'));
+      return parts.join(' & ') || '< 1 month';
+    }
+
+    function renderPage() {
+      const p = getPlan();
+      if (!p) { window.location.href = 'savings-planner.html'; return; }
+
+      const progress  = pct(p.current, p.goal);
+      const color     = progressColor(progress);
+      const reached   = p.current >= p.goal && p.goal > 0;
+      const remaining = Math.max(0, (Number(p.goal) || 0) - (Number(p.current) || 0));
+      const months    = monthsToGoal(Number(p.current), Number(p.goal), Number(p.monthly));
+      const duration  = formatDuration(months);
+
+      // Nav
+      document.getElementById('navTitle').textContent = p.name;
+      document.title = `FinTrack — ${p.name}`;
+      document.getElementById('navPct').textContent = progress + '%';
+      document.getElementById('currentDisplay').textContent = fmt(p.current);
+
+      // Progress panel
+      const scroll = document.getElementById('progressScroll');
+      scroll.innerHTML = '';
+
+      const hero = document.createElement('div');
+      hero.className = 'sp-detail-hero';
+      hero.innerHTML = `
+        <div class="sp-detail-hero-amount" style="color:${color}">${fmt(p.current)}</div>
+        <div class="sp-detail-hero-label">saved so far</div>
+        <div class="sp-detail-bar-track">
+          <div class="sp-detail-bar-fill" style="width:${progress}%;background:${color}"></div>
+        </div>
+        <div class="sp-detail-bar-meta">
+          <span>${progress}% complete</span>
+          <span>${fmt(p.goal)} goal</span>
+        </div>
+      `;
+      scroll.appendChild(hero);
+
+      // Stats
+      const stats = [
+        { label: 'Goal',            val: fmt(p.goal),    color: 'var(--blue)'    },
+        { label: 'Still needed',    val: reached ? 'Reached!' : fmt(remaining), color: reached ? 'var(--income)' : 'var(--text)' },
+        { label: 'Monthly saving',  val: fmt(p.monthly), color: 'var(--text)'   },
+      ];
+
+      const statsRow = document.createElement('div');
+      statsRow.className = 'sp-detail-stats';
+      statsRow.innerHTML = stats.map(s => `
+        <div class="sp-detail-stat">
+          <span class="sp-stat-label">${s.label}</span>
+          <span class="sp-stat-val" style="color:${s.color}">${s.val}</span>
+        </div>
+      `).join('');
+      scroll.appendChild(statsRow);
+
+      // ETA
+      const eta = document.createElement('div');
+      if (reached) {
+        eta.className = 'sp-detail-eta sp-eta-done';
+        eta.textContent = 'Goal reached!';
+      } else if (duration) {
+        eta.className = 'sp-detail-eta';
+        eta.innerHTML = `About <strong>${duration}</strong> to reach your goal`;
+      } else {
+        eta.className = 'sp-detail-eta sp-eta-no-contrib';
+        eta.textContent = 'Set a monthly contribution to see your estimated time to goal.';
+      }
+      scroll.appendChild(eta);
+
+      // Populate form
+      document.getElementById('fName').value    = p.name;
+      document.getElementById('fCurrent').value = p.current || '';
+      document.getElementById('fGoal').value    = p.goal    || '';
+      document.getElementById('fMonthly').value = p.monthly || '';
+    }
+
+    function save() {
+      const name    = document.getElementById('fName').value.trim();
+      const current = parseFloat(document.getElementById('fCurrent').value) || 0;
+      const goal    = parseFloat(document.getElementById('fGoal').value)    || 0;
+      const monthly = parseFloat(document.getElementById('fMonthly').value) || 0;
+
+      if (!name) { document.getElementById('fName').focus(); return; }
+
+      const plans = getPlans();
+      const idx   = plans.findIndex(p => p.id === getId());
+      if (idx === -1) return;
+      plans[idx] = { ...plans[idx], name, current, goal, monthly };
+      savePlans(plans);
+      renderPage();
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', save);
+
+    // Save on Enter in any input
+    document.querySelectorAll('.sp-settings-form input').forEach(input => {
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+    });
+
+    // Panel resizer (mirrors category-page.html)
+    function initResizer() {
+      if (window.matchMedia('(max-width: 700px)').matches) return;
+      const left   = document.querySelector('.items-panel');
+      const right  = document.getElementById('settingsSide');
+      const handle = document.getElementById('panelResizer');
+      const SK     = 'spDetailWidth';
+      const saved  = localStorage.getItem(SK);
+      if (saved) right.style.flex = `0 0 ${saved}px`;
+
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        handle.classList.add('resizing');
+        document.body.style.cursor    = 'col-resize';
+        document.body.style.userSelect = 'none';
+        const startX     = e.clientX;
+        const startRight = right.getBoundingClientRect().width;
+        const startLeft  = left.getBoundingClientRect().width;
+
+        function onMove(e) {
+          const delta    = e.clientX - startX;
+          const newRight = Math.max(220, Math.min(startRight - delta, startLeft + startRight - 260));
+          right.style.flex = `0 0 ${newRight}px`;
+          localStorage.setItem(SK, newRight);
+        }
+        function onUp() {
+          handle.classList.remove('resizing');
+          document.body.style.cursor = document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    }
+
+    (async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      renderPage();
+      initResizer();
+    })();
+  </script>
+</body>
+</html>

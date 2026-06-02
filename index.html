@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Sign In</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-login">
+
+  <div class="login-wrap">
+    <div class="login-brand">
+      <div class="brand-mark">Ft</div>
+      <span class="brand-name">FinTrack</span>
+    </div>
+
+    <div class="login-card">
+      <!-- Tab switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabSignIn" onclick="showTab('signin')">Sign In</button>
+        <button class="auth-tab" id="tabSignUp" onclick="showTab('signup')">Create Account</button>
+      </div>
+
+      <!-- Sign In -->
+      <form id="formSignIn" class="login-form" autocomplete="on">
+        <div class="field-group">
+          <label for="siEmail">Email</label>
+          <input id="siEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+        <div class="field-group">
+          <label for="siPassword">Password</label>
+          <input id="siPassword" type="password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <div id="siError" class="login-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="siBtn">Sign In</button>
+      </form>
+
+      <!-- Sign Up -->
+      <form id="formSignUp" class="login-form hidden" autocomplete="on">
+        <div class="field-group">
+          <label for="suName">Your name</label>
+          <input id="suName" type="text" placeholder="Jane" autocomplete="given-name" required>
+        </div>
+        <div class="field-group">
+          <label for="suEmail">Email</label>
+          <input id="suEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+        <div class="field-group">
+          <label for="suPassword">Password</label>
+          <input id="suPassword" type="password" placeholder="At least 6 characters" autocomplete="new-password" required minlength="6">
+        </div>
+        <div id="suError" class="login-error hidden"></div>
+        <div id="suSuccess" class="login-success hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="suBtn">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // If already signed in, skip to landing page
+    (async () => {
+      const { data: { session } } = await _sb.auth.getSession();
+      if (session) window.location.href = 'landing-page.html';
+    })();
+
+    function showTab(tab) {
+      const isSignIn = tab === 'signin';
+      document.getElementById('tabSignIn').classList.toggle('active', isSignIn);
+      document.getElementById('tabSignUp').classList.toggle('active', !isSignIn);
+      document.getElementById('formSignIn').classList.toggle('hidden', !isSignIn);
+      document.getElementById('formSignUp').classList.toggle('hidden', isSignIn);
+    }
+
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.textContent = loading ? 'Please wait…' : (btnId === 'siBtn' ? 'Sign In' : 'Create Account');
+    }
+
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function hideError(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    document.getElementById('formSignIn').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError('siError');
+      setLoading('siBtn', true);
+      try {
+        await State.signIn(
+          document.getElementById('siEmail').value.trim(),
+          document.getElementById('siPassword').value
+        );
+        window.location.href = 'landing-page.html';
+      } catch (err) {
+        showError('siError', err.message || 'Sign in failed. Check your email and password.');
+      } finally {
+        setLoading('siBtn', false);
+      }
+    });
+
+    document.getElementById('formSignUp').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError('suError');
+      document.getElementById('suSuccess').classList.add('hidden');
+      setLoading('suBtn', true);
+      try {
+        const result = await State.signUp(
+          document.getElementById('suEmail').value.trim(),
+          document.getElementById('suPassword').value,
+          document.getElementById('suName').value.trim()
+        );
+        if (result.session) {
+          window.location.href = 'landing-page.html';
+        } else {
+          // Email confirmation required
+          const el = document.getElementById('suSuccess');
+          el.textContent = 'Account created! Check your email to confirm your address, then sign in.';
+          el.classList.remove('hidden');
+          showTab('signin');
+        }
+      } catch (err) {
+        showError('suError', err.message || 'Sign up failed. Please try again.');
+      } finally {
+        setLoading('suBtn', false);
+      }
+    });
+  </script>
+</body>
+</html>

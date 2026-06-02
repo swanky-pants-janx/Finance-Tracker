@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Savings Planner</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-savings">
+
+  <nav class="top-nav">
+    <button class="nav-back" onclick="window.location.href='landing-page.html'">← Back</button>
+    <span class="nav-title">Savings Planner</span>
+  </nav>
+
+  <div class="savings-board">
+    <div class="finance-col">
+      <div class="col-header">
+        <div class="col-header-row">
+          <span class="col-label" style="color:var(--income)">Savings Goals</span>
+        </div>
+        <div class="col-total" id="totalSaved" style="color:var(--income)">R 0.00</div>
+        <div class="col-total-sub">total saved across all goals</div>
+      </div>
+      <div class="col-scroll" id="goalsScroll"></div>
+    </div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    function getPlans() { return State.getSavings(); }
+    function savePlans(p) { State.saveSavings(p); }
+
+    function fmt(n) {
+      return 'R ' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pct(current, goal) {
+      if (!goal || goal <= 0) return 0;
+      return Math.min(100, Math.round((current / goal) * 100));
+    }
+
+    function progressColor(p) {
+      if (p < 40) return 'var(--expense)';
+      if (p < 75) return '#f0a541';
+      return 'var(--income)';
+    }
+
+    function render() {
+      const plans = getPlans();
+      const scroll = document.getElementById('goalsScroll');
+      scroll.innerHTML = '';
+
+      const total = plans.reduce((s, p) => s + (Number(p.current) || 0), 0);
+      document.getElementById('totalSaved').textContent = fmt(total);
+
+      plans.forEach(p => scroll.appendChild(makeCard(p)));
+      scroll.appendChild(makeAddRow());
+    }
+
+    function makeCard(p) {
+      const progress = pct(p.current, p.goal);
+      const color = progressColor(progress);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'sp-goal-card';
+      wrap.dataset.id = p.id;
+
+      wrap.innerHTML = `
+        <div class="sp-goal-card-row">
+          <span class="card-name">${esc(p.name)}</span>
+          <span class="card-amt">${fmt(p.current)} / ${fmt(p.goal)}</span>
+          <button class="card-del" title="Delete">×</button>
+        </div>
+        <div class="sp-goal-bar-wrap">
+          <div class="sp-goal-bar-track">
+            <div class="sp-goal-bar-fill" style="width:${progress}%;background:${color}"></div>
+          </div>
+          <span class="sp-goal-bar-pct">${progress}%</span>
+        </div>
+      `;
+
+      // Navigate on card click (not delete)
+      wrap.addEventListener('click', (e) => {
+        if (e.target.closest('.card-del')) return;
+        window.location.href = `savings-detail.html?id=${p.id}`;
+      });
+
+      wrap.querySelector('.card-del').addEventListener('click', (e) => {
+        e.stopPropagation();
+        savePlans(getPlans().filter(x => x.id !== p.id));
+        render();
+      });
+
+      return wrap;
+    }
+
+    function makeAddRow() {
+      const wrap = document.createElement('div');
+
+      const btn = document.createElement('button');
+      btn.className = 'add-cat-btn';
+      btn.textContent = '+ Add savings goal';
+      btn.addEventListener('click', () => {
+        wrap.innerHTML = '';
+        wrap.appendChild(makeAddForm(wrap));
+        wrap.querySelector('input').focus();
+      });
+
+      wrap.appendChild(btn);
+      return wrap;
+    }
+
+    function makeAddForm(wrap) {
+      const form = document.createElement('div');
+      form.className = 'add-cat-form';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Goal name (e.g. Emergency Fund)';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn btn-primary';
+      saveBtn.textContent = 'Add';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn btn-ghost';
+      cancelBtn.textContent = '✕';
+
+      form.append(input, saveBtn, cancelBtn);
+
+      const save = () => {
+        const name = input.value.trim();
+        if (!name) return;
+        const plans = getPlans();
+        plans.push({ id: 'sp_' + Date.now(), name, current: 0, goal: 0, monthly: 0 });
+        savePlans(plans);
+        render();
+      };
+
+      saveBtn.addEventListener('click', save);
+      cancelBtn.addEventListener('click', () => render());
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') save();
+        if (e.key === 'Escape') render();
+      });
+
+      return form;
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    (async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      render();
+    })();
+  </script>
+</body>
+</html>

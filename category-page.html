@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Category</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-category">
+
+  <!-- ── Top nav ── -->
+  <nav class="top-nav">
+    <button class="nav-back" id="navBack">← Back</button>
+    <span class="nav-title" id="navTitle">Category</span>
+    <span class="nav-tag" id="navTag"></span>
+  </nav>
+
+  <!-- ── Content ── -->
+  <div class="cat-content">
+
+    <!-- Items list -->
+    <div class="items-panel">
+      <div class="items-head">
+        <span class="items-head-title">Items</span>
+        <span class="items-total-val" id="itemsTotal">R 0.00</span>
+      </div>
+      <!-- Add form + items rendered here by JS -->
+      <div class="items-scroll" id="itemsScroll"></div>
+    </div>
+
+    <div class="col-resizer" id="panelResizer"></div>
+
+    <!-- Chart side -->
+    <div class="chart-side" id="chartSide">
+
+      <!-- Category breakdown chart -->
+      <div class="chart-section">
+        <div class="chart-title">Category breakdown</div>
+        <div class="chart-box-wrap"><div id="chartBox"><canvas id="catChart"></canvas></div></div>
+        <div id="chartEmpty" class="empty-chart hidden">
+          <div class="empty-chart-icon">🥧</div>
+          <div>Add items to see<br>the breakdown</div>
+        </div>
+        <div class="chart-legend" id="catLegend"></div>
+      </div>
+
+      <div class="chart-divider"></div>
+
+      <!-- Overall budget chart -->
+      <div class="chart-section">
+        <div class="chart-section-header">
+          <div class="col-label">Remaining</div>
+          <div class="chart-remaining-amt" id="chartRemainingAmt">R 0.00</div>
+        </div>
+        <div class="chart-box-wrap"><div id="overallChartBox"><canvas id="overallChart"></canvas></div></div>
+        <div id="overallChartEmpty" class="empty-chart hidden">
+          <div class="empty-chart-icon">🥧</div>
+          <div>No expense data yet</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const fmt = State.fmt;
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function getParams() {
+      const p = new URLSearchParams(window.location.search);
+      return { type: p.get('type'), id: p.get('id') };
+    }
+
+    function getState() {
+      const { type, id } = getParams();
+      const data = State.getData();
+      const plan = data.plans.find(p => p.id === data.activePlanId) || data.plans[0];
+      const arr  = type === 'income' ? plan.income.categories : plan.expenses.categories;
+      return { data, plan, type, category: arr.find(c => c.id === id) };
+    }
+
+    // Total of active (non-disabled) items, resolving pct items
+    function activeTotal(cat, plan) {
+      return cat.items
+        .filter(i => !i.disabled)
+        .reduce((s, i) => s + State.resolveItemAmt(i, plan), 0);
+    }
+
+    /* ════════════════════════════════════════
+       DRAG STATE (items)
+    ════════════════════════════════════════ */
+    let itemDragId = null;
+
+    /* ════════════════════════════════════════
+       CHARTS
+    ════════════════════════════════════════ */
+    const COLORS = ['#7c6af5','#58a6ff','#f85149','#3fb950','#fb923c','#a78bfa','#38bdf8','#fbbf24','#4ade80','#f472b6'];
+    let catChart = null;
+    let overallChart = null;
+
+    function renderOverallChart(currentCatId, currentType, plan) {
+      if (overallChart) { overallChart.destroy(); overallChart = null; }
+
+      function baseCatTotal(cat) {
+        return cat.items.filter(i => !i.disabled).reduce((s, i) => s + State.resolveItemAmt(i, plan), 0);
+      }
+
+      const incGross = plan.income.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + baseCatTotal(c), 0);
+      const incAfterTax = incGross - calcSATax(incGross);
+      const totalExp = plan.expenses.categories.filter(c => !c.disabled).reduce((s, c) => s + baseCatTotal(c), 0);
+      const remaining = incAfterTax - totalExp;
+      const remEl = document.getElementById('chartRemainingAmt');
+      if (remEl) { remEl.textContent = fmt(remaining); remEl.className = 'chart-remaining-amt' + (remaining < 0 ? ' neg' : ''); }
+
+      const expCats = plan.expenses.categories.filter(c => !c.disabled && baseCatTotal(c) > 0);
+
+      if (expCats.length === 0) {
+        document.getElementById('overallChartBox').classList.add('hidden');
+        document.getElementById('overallChartEmpty').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('overallChartBox').classList.remove('hidden');
+      document.getElementById('overallChartEmpty').classList.add('hidden');
+
+      const values  = expCats.map(c => baseCatTotal(c));
+      const bgColors = expCats.map((_, i) => COLORS[i % COLORS.length]);
+      const currentIdx = currentType === 'expense' ? expCats.findIndex(c => c.id === currentCatId) : -1;
+      const offsets  = values.map((_, i) => i === currentIdx ? 8 : 0);
+
+      Chart.defaults.color = '#7d8a9e';
+      overallChart = new Chart(document.getElementById('overallChart'), {
+        type: 'doughnut',
+        data: {
+          labels: expCats.map(c => c.name),
+          datasets: [{
+            data: values,
+            backgroundColor: bgColors,
+            borderColor: '#161b27',
+            borderWidth: 2,
+            offset: offsets,
+            hoverOffset: 18
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 1,
+          cutout: '60%',
+          layout: { padding: 16 },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const pct = incAfterTax > 0 ? ((ctx.raw / incAfterTax) * 100).toFixed(1) : 0;
+                  return ` ${fmt(ctx.raw)}  (${pct}% of income)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+    }
+
+    /* ════════════════════════════════════════
+       RENDER PAGE
+    ════════════════════════════════════════ */
+    function renderPage() {
+      const { data, plan, type, category } = getState();
+      if (!category) { window.location.href = 'finance-app.html'; return; }
+
+      const total = activeTotal(category, plan);
+
+      // Nav
+      document.getElementById('navTitle').textContent = category.name;
+      document.title = `FinTrack — ${category.name}`;
+      const tag = document.getElementById('navTag');
+      tag.textContent = type === 'income' ? 'Income' : 'Expense';
+      tag.className = 'nav-tag ' + type;
+
+      // Total
+      const totEl = document.getElementById('itemsTotal');
+      totEl.textContent = fmt(total);
+      totEl.className = 'items-total-val ' + type;
+
+      // Add form always at top, items accumulate below it
+      const scroll = document.getElementById('itemsScroll');
+      scroll.innerHTML = '';
+      scroll.appendChild(makeAddItemForm(category.id, type, plan));
+
+      if (category.items.length > 0) {
+        category.items.forEach(item => {
+          scroll.appendChild(makeItemRow(item, category, plan));
+        });
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'empty-items';
+        empty.innerHTML = `
+          <div class="empty-items-icon">📋</div>
+          <div>No items yet</div>
+          <div style="color:var(--muted);font-size:12px">Use the form above to add your first item</div>
+        `;
+        scroll.appendChild(empty);
+      }
+
+      // Overall budget chart
+      renderOverallChart(category.id, type, plan);
+
+      // Category breakdown chart (active, non-disabled items)
+      if (catChart) { catChart.destroy(); catChart = null; }
+      const chartItems = category.items.filter(i => !i.disabled);
+
+      if (chartItems.length === 0) {
+        document.getElementById('chartBox').classList.add('hidden');
+        document.getElementById('chartEmpty').classList.remove('hidden');
+        document.getElementById('catLegend').innerHTML = '';
+      } else {
+        document.getElementById('chartBox').classList.remove('hidden');
+        document.getElementById('chartEmpty').classList.add('hidden');
+
+        const chartValues = chartItems.map(i => State.resolveItemAmt(i, plan));
+        const chartTotal  = chartValues.reduce((s, v) => s + v, 0);
+
+        Chart.defaults.color = '#7d8a9e';
+        catChart = new Chart(document.getElementById('catChart'), {
+          type: 'doughnut',
+          data: {
+            labels: chartItems.map(i => i.name),
+            datasets: [{
+              data: chartValues,
+              backgroundColor: COLORS.slice(0, chartItems.length),
+              borderColor: '#161b27',
+              borderWidth: 2,
+              hoverOffset: 18
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 1,
+            cutout: '60%',
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const pct = chartTotal > 0 ? ((ctx.raw / chartTotal) * 100).toFixed(1) : 0;
+                    return ` ${fmt(ctx.raw)}  (${pct}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        const legend = document.getElementById('catLegend');
+        legend.innerHTML = '';
+        chartItems.forEach((item, i) => {
+          const v = chartValues[i];
+          const pct = chartTotal > 0 ? ((v / chartTotal) * 100).toFixed(1) : 0;
+          const el = document.createElement('div');
+          el.className = 'leg-item';
+          el.innerHTML = `
+            <div class="leg-dot" style="background:${COLORS[i % COLORS.length]}"></div>
+            <span class="leg-name">${esc(item.name)}</span>
+            <span class="leg-pct">${pct}%</span>
+          `;
+          legend.appendChild(el);
+        });
+      }
+    }
+
+    /* ════════════════════════════════════════
+       ADD ITEM FORM (top of scroll)
+    ════════════════════════════════════════ */
+    function makeAddItemForm(catId, type, plan) {
+      const wrap = document.createElement('div');
+      wrap.className = 'add-item-wrap';
+
+      let pctMode = false;
+
+      function buildForm() {
+        wrap.innerHTML = '';
+
+        const row = document.createElement('div');
+        row.className = 'add-item-form';
+
+        // Description
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.placeholder = 'Description';
+        nameInput.className = 'add-name-input';
+
+        // Amount
+        const amtInput = document.createElement('input');
+        amtInput.type = 'number';
+        amtInput.min = '0';
+        amtInput.step = pctMode ? '1' : '0.01';
+        amtInput.placeholder = pctMode ? '0' : '0.00';
+        amtInput.className = 'add-amt-input';
+
+        // R / % toggle
+        const modeBtn = document.createElement('button');
+        modeBtn.type = 'button';
+        modeBtn.className = 'btn btn-ghost pct-toggle' + (pctMode ? ' active' : '');
+        modeBtn.textContent = pctMode ? '%' : 'R';
+        modeBtn.title = pctMode ? 'Switch to fixed amount' : 'Switch to percentage';
+        modeBtn.addEventListener('click', () => {
+          const savedName = nameInput.value;
+          const savedAmt  = amtInput.value;
+          pctMode = !pctMode;
+          buildForm();
+          wrap.querySelector('.add-name-input').value = savedName;
+          wrap.querySelector('.add-amt-input').value  = savedAmt;
+          wrap.querySelector('.add-name-input').focus();
+        });
+
+        row.append(nameInput, modeBtn, amtInput);
+
+        // Relative-to select (only in % mode)
+        let refSelect = null;
+        if (pctMode) {
+          const ofLabel = document.createElement('span');
+          ofLabel.textContent = 'of';
+          ofLabel.className = 'pct-of-label';
+          refSelect = buildRefSelect(plan, catId);
+          row.append(ofLabel, refSelect);
+        }
+
+        // Add button
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'btn btn-primary';
+        addBtn.textContent = 'Add';
+        row.appendChild(addBtn);
+
+        const save = () => {
+          const name = nameInput.value.trim();
+          if (!name) { nameInput.focus(); return; }
+
+          const { data, category } = getState();
+          if (!category) return;
+
+          if (pctMode) {
+            const pctVal = parseFloat(amtInput.value);
+            if (isNaN(pctVal) || pctVal <= 0) { amtInput.focus(); return; }
+            if (!refSelect || !refSelect.value) return;
+            const [refType, refId] = refSelect.value.split(':');
+            category.items.push({ id: State.genId(), name, pctMode: true, pctValue: pctVal, refType, refId, disabled: false });
+          } else {
+            const amount = parseFloat(amtInput.value);
+            if (isNaN(amount) || amount <= 0) { amtInput.focus(); return; }
+            category.items.push({ id: State.genId(), name, amount, pctMode: false, disabled: false });
+          }
+
+          State.saveData(data);
+          renderPage();
+        };
+
+        addBtn.addEventListener('click', save);
+        nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') amtInput.focus(); });
+        amtInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+
+        wrap.appendChild(row);
+      }
+
+      buildForm();
+      return wrap;
+    }
+
+    // Builds the "relative to" <select> from all categories + non-pct items in the plan
+    function buildRefSelect(plan, excludeCatId) {
+      const sel = document.createElement('select');
+      sel.className = 'ref-select';
+
+      function baseCatAmt(cat) {
+        return cat.items.filter(i => !i.disabled && !i.pctMode)
+          .reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+      }
+
+      // Calculate income after tax for the label
+      const grossIncome = plan.income.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + baseCatAmt(c), 0);
+      const incAfterTax = grossIncome - calcSATax(grossIncome);
+
+      // Special calculated values group
+      const calcGroup = document.createElement('optgroup');
+      calcGroup.label = 'Calculated Values';
+      const afterTaxOpt = document.createElement('option');
+      afterTaxOpt.value = 'afterTax:__afterTax__';
+      afterTaxOpt.textContent = 'Income After Tax  (' + fmt(incAfterTax) + ')';
+      calcGroup.appendChild(afterTaxOpt);
+      sel.appendChild(calcGroup);
+
+      let hasOpts = false;
+
+      function addCatGroup(cats, label) {
+        const group = document.createElement('optgroup');
+        group.label = label;
+        cats.filter(c => !c.disabled && c.id !== excludeCatId).forEach(cat => {
+          const opt = document.createElement('option');
+          opt.value = 'cat:' + cat.id;
+          opt.textContent = cat.name + '  (' + fmt(baseCatAmt(cat)) + ')';
+          group.appendChild(opt);
+          hasOpts = true;
+        });
+        if (group.children.length) sel.appendChild(group);
+      }
+
+      addCatGroup(plan.income.categories,   'Income Categories');
+      addCatGroup(plan.expenses.categories, 'Expense Categories');
+
+      // Individual non-pct items
+      const itemGroup = document.createElement('optgroup');
+      itemGroup.label = 'Items';
+      [...plan.income.categories, ...plan.expenses.categories].forEach(cat => {
+        cat.items.filter(i => !i.disabled && !i.pctMode).forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = 'item:' + item.id;
+          opt.textContent = item.name + '  ·  ' + cat.name + '  (' + fmt(item.amount) + ')';
+          itemGroup.appendChild(opt);
+          hasOpts = true;
+        });
+      });
+      if (itemGroup.children.length) sel.appendChild(itemGroup);
+
+      if (!hasOpts) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No references available';
+        sel.appendChild(opt);
+      }
+
+      return sel;
+    }
+
+    /* ════════════════════════════════════════
+       INLINE ITEM EDIT
+    ════════════════════════════════════════ */
+    function startEditItem(item, row, plan) {
+      const form = document.createElement('div');
+      form.className = 'add-item-form edit-item-form';
+
+      let pctMode = !!item.pctMode;
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = item.name;
+      nameInput.className = 'add-name-input';
+
+      const amtInput = document.createElement('input');
+      amtInput.type = 'number';
+      amtInput.min = '0';
+      amtInput.className = 'add-amt-input';
+
+      const modeBtn = document.createElement('button');
+      modeBtn.type = 'button';
+
+      let refSelect = null;
+      let ofLabel = null;
+
+      function refreshMode() {
+        amtInput.step = pctMode ? '1' : '0.01';
+        amtInput.placeholder = pctMode ? '0' : '0.00';
+        amtInput.value = pctMode ? (item.pctValue ?? '') : (item.amount ?? '');
+        modeBtn.className = 'btn btn-ghost pct-toggle' + (pctMode ? ' active' : '');
+        modeBtn.textContent = pctMode ? '%' : 'R';
+        modeBtn.title = pctMode ? 'Switch to fixed amount' : 'Switch to percentage';
+
+        // Remove existing of+select if present
+        if (ofLabel)   { ofLabel.remove();   ofLabel   = null; }
+        if (refSelect) { refSelect.remove();  refSelect = null; }
+
+        if (pctMode) {
+          ofLabel   = document.createElement('span');
+          ofLabel.textContent = 'of';
+          ofLabel.className   = 'pct-of-label';
+          refSelect = buildRefSelect(plan, item.id);
+          // Pre-select current ref
+          const currentVal = item.refType && item.refId ? `${item.refType}:${item.refId}` : item.refType === 'afterTax' ? 'afterTax:afterTax' : '';
+          for (const opt of refSelect.options) { if (opt.value === currentVal) { opt.selected = true; break; } }
+          saveBtn.before(ofLabel);
+          saveBtn.before(refSelect);
+        }
+      }
+
+      modeBtn.addEventListener('click', () => {
+        const savedName = nameInput.value;
+        const savedAmt  = amtInput.value;
+        pctMode = !pctMode;
+        refreshMode();
+        nameInput.value = savedName;
+        amtInput.value  = savedAmt;
+      });
+
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'btn btn-primary';
+      saveBtn.textContent = 'Save';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn btn-ghost';
+      cancelBtn.textContent = '✕';
+
+      form.append(nameInput, modeBtn, amtInput, saveBtn, cancelBtn);
+      refreshMode();
+
+      const commit = () => {
+        const name = nameInput.value.trim();
+        if (!name) { nameInput.focus(); return; }
+        const { data, category: cat } = getState();
+        if (!cat) return;
+        const itm = cat.items.find(x => x.id === item.id);
+        if (!itm) return;
+        itm.name = name;
+        if (pctMode) {
+          const pctVal = parseFloat(amtInput.value);
+          if (isNaN(pctVal) || pctVal <= 0) { amtInput.focus(); return; }
+          if (!refSelect || !refSelect.value) return;
+          const [refType, refId] = refSelect.value.split(':');
+          itm.pctMode = true; itm.pctValue = pctVal; itm.refType = refType; itm.refId = refId;
+          delete itm.amount;
+        } else {
+          const amount = parseFloat(amtInput.value);
+          if (isNaN(amount) || amount <= 0) { amtInput.focus(); return; }
+          itm.pctMode = false; itm.amount = amount;
+          delete itm.pctValue; delete itm.refType; delete itm.refId;
+        }
+        State.saveData(data);
+        renderPage();
+      };
+
+      saveBtn.addEventListener('click', commit);
+      cancelBtn.addEventListener('click', () => renderPage());
+      nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') renderPage(); });
+      amtInput.addEventListener('keydown',  (e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') renderPage(); });
+
+      row.replaceWith(form);
+      nameInput.focus();
+      nameInput.select();
+    }
+
+    /* ════════════════════════════════════════
+       ITEM ROW
+    ════════════════════════════════════════ */
+    function makeItemRow(item, category, plan) {
+      const row = document.createElement('div');
+      row.className = 'item-row' + (item.disabled ? ' is-disabled' : '');
+      row.draggable = true;
+      row.dataset.id = item.id;
+
+      const resolved = State.resolveItemAmt(item, plan);
+      const amtDisplay = fmt(resolved);
+
+      // For pct items, build a small label showing "15% of Salary"
+      let pctLabel = '';
+      if (item.pctMode) {
+        let refName = '?';
+        if (item.refType === 'afterTax') {
+          refName = 'Income After Tax';
+        } else {
+          const allCats = [...plan.income.categories, ...plan.expenses.categories];
+          if (item.refType === 'cat') {
+            const cat = allCats.find(c => c.id === item.refId);
+            if (cat) refName = cat.name;
+          } else {
+            for (const cat of allCats) {
+              const ri = cat.items.find(i => i.id === item.refId);
+              if (ri) { refName = ri.name; break; }
+            }
+          }
+        }
+        pctLabel = `${item.pctValue}% of ${refName}`;
+      }
+
+      const toggleIcon  = item.disabled ? '▶' : '⏸';
+      const toggleTitle = item.disabled ? 'Re-enable' : 'Disable';
+
+      row.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <span class="item-name">${esc(item.name)}</span>
+        ${item.pctMode ? `<span class="item-pct-ref">${esc(pctLabel)}</span>` : ''}
+        <span class="item-amt">${amtDisplay}</span>
+        <button class="item-toggle ${item.disabled ? 'is-disabled' : ''}" title="${toggleTitle}">${toggleIcon}</button>
+        <button class="item-del" title="Delete">×</button>
+      `;
+
+      // Click row to edit (ignore action buttons and drag handle)
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.item-del') || e.target.closest('.item-toggle') || e.target.classList.contains('drag-handle')) return;
+        startEditItem(item, row, plan);
+      });
+
+      row.querySelector('.item-toggle').addEventListener('click', () => {
+        const { data, category: cat } = getState();
+        if (!cat) return;
+        const itm = cat.items.find(x => x.id === item.id);
+        if (itm) itm.disabled = !itm.disabled;
+        State.saveData(data);
+        renderPage();
+      });
+
+      row.querySelector('.item-del').addEventListener('click', () => {
+        const { data, category: cat } = getState();
+        if (!cat) return;
+        cat.items = cat.items.filter(i => i.id !== item.id);
+        State.saveData(data);
+        renderPage();
+      });
+
+      // Drag & drop
+      row.addEventListener('dragstart', (e) => {
+        itemDragId = item.id;
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => row.classList.add('dragging'));
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        document.querySelectorAll('.item-row.drag-over').forEach(x => x.classList.remove('drag-over'));
+        itemDragId = null;
+      });
+      row.addEventListener('dragover', e => e.preventDefault());
+      row.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        if (itemDragId && itemDragId !== item.id) row.classList.add('drag-over');
+      });
+      row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        row.classList.remove('drag-over');
+        if (!itemDragId || itemDragId === item.id) return;
+        const { data, category: cat } = getState();
+        if (!cat) return;
+        const si = cat.items.findIndex(i => i.id === itemDragId);
+        const ti = cat.items.findIndex(i => i.id === item.id);
+        const [moved] = cat.items.splice(si, 1);
+        cat.items.splice(ti, 0, moved);
+        State.saveData(data);
+        renderPage();
+      });
+
+      return row;
+    }
+
+    /* ════════════════════════════════════════
+       PANEL RESIZER
+    ════════════════════════════════════════ */
+    function initResizer() {
+      if (window.matchMedia('(max-width: 700px)').matches) return;
+
+      const leftPanel  = document.querySelector('.items-panel');
+      const rightPanel = document.getElementById('chartSide');
+      const handle     = document.getElementById('panelResizer');
+      const STORAGE_KEY = 'catPanelWidth';
+
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) rightPanel.style.flex = `0 0 ${saved}px`;
+
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        handle.classList.add('resizing');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        const startX = e.clientX;
+        const startRight = rightPanel.getBoundingClientRect().width;
+        const startLeft  = leftPanel.getBoundingClientRect().width;
+        const minRight = 200;
+        const minLeft  = 260;
+
+        function onMove(e) {
+          const delta = e.clientX - startX;
+          const newRight = Math.max(minRight, Math.min(startRight - delta, startLeft + startRight - minLeft));
+          rightPanel.style.flex = `0 0 ${newRight}px`;
+          localStorage.setItem(STORAGE_KEY, newRight);
+          if (catChart) catChart.resize();
+          if (overallChart) overallChart.resize();
+        }
+
+        function onUp() {
+          handle.classList.remove('resizing');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    }
+
+    /* ════════════════════════════════════════
+       INIT
+    ════════════════════════════════════════ */
+    document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      renderPage();
+      initResizer();
+      document.getElementById('navBack').addEventListener('click', () => {
+        window.location.href = 'finance-app.html';
+      });
+    });
+  </script>
+</body>
+</html>
