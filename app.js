@@ -136,7 +136,7 @@ const State = {
   // ── Finance data ──
 
   getData: () => {
-    if (!State._cache) return State._defaultData().finance;
+    if (!State._cache) State._cache = State._defaultData();
     return State._cache.finance;
   },
 
