@@ -1077,10 +1077,34 @@ input::placeholder { color: var(--muted); }
   /* ── Budget tracker ── */
   .page-budget { height: auto; min-height: 100vh; overflow-y: auto; }
   .budget-wrap { overflow-y: visible; padding: 10px; gap: 10px; }
-  .bt-summary-strip { padding: 10px 12px; gap: 8px; }
-  .bt-stat-label { font-size: 9px; }
-  .bt-stat-val { font-size: 13px; letter-spacing: -.2px; }
+
+  .bt-summary-strip {
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 0;
+  }
+  .bt-summary-stat {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-sub);
+    min-width: 0;
+  }
+  .bt-summary-stat:last-child { border-bottom: none; }
+  .bt-stat-label { font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+  .bt-stat-val { font-size: 15px; }
   .bt-summary-divider { display: none; }
+
+  /* Variable item rows: stack title above amounts */
+  .bt-var-top {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .bt-var-top .bt-item-name {
+    width: 100%;
+    flex-basis: 100%;
+  }
 
   /* ── Login ── */
   .login-wrap { padding: 16px; gap: 20px; }
