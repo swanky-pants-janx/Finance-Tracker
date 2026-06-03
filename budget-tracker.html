@@ -11,9 +11,32 @@
   <nav class="top-nav">
     <button class="nav-back" onclick="State.flush().then(()=>window.location.href='budget-hub.html')">← Back</button>
     <span class="nav-title" id="navTitle">Budget Tracker</span>
+    <div class="nav-actions">
+      <button class="btn btn-ghost view-toggle-btn hidden" id="viewToggleBtn" onclick="toggleView()">⊞ Table View</button>
+    </div>
   </nav>
 
   <div class="budget-wrap" id="budgetWrap"></div>
+
+  <!-- Table view (hidden by default) -->
+  <div class="table-view hidden" id="tableView">
+    <div class="table-wrap">
+      <table class="finance-table" id="budgetTable">
+        <thead>
+          <tr>
+            <th class="th-category">Category</th>
+            <th class="th-item">Item</th>
+            <th class="th-type">Type</th>
+            <th class="th-amount">Allocated</th>
+            <th class="th-amount">Spent</th>
+            <th class="th-amount">Remaining</th>
+            <th class="th-pct">% of Income</th>
+          </tr>
+        </thead>
+        <tbody id="budgetTableBody"></tbody>
+      </table>
+    </div>
+  </div>
 
   <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -155,6 +178,9 @@
       // Auto-sync plan changes into budget on every load
       State.syncBudgetFromPlan(currentBudget);
       State.saveBudget(currentBudget);
+
+      // Show the table-view toggle now that we have a budget
+      document.getElementById('viewToggleBtn').classList.remove('hidden');
 
       // Three-column layout matching finance-app structure
       const board = document.createElement('div');
@@ -354,6 +380,101 @@
       });
 
       return div;
+    }
+
+    /* ─── Table view ─── */
+    let tableViewActive = false;
+
+    function toggleView() {
+      tableViewActive = !tableViewActive;
+      const btn   = document.getElementById('viewToggleBtn');
+      const board = document.getElementById('budgetWrap');
+      const table = document.getElementById('tableView');
+      if (tableViewActive) {
+        board.classList.add('hidden');
+        table.classList.remove('hidden');
+        buildTableView();
+        btn.textContent = '⊟ Board View';
+      } else {
+        board.classList.remove('hidden');
+        table.classList.add('hidden');
+        btn.textContent = '⊞ Table View';
+      }
+    }
+
+    function buildTableView() {
+      if (!currentBudget) return;
+      const tbody = document.getElementById('budgetTableBody');
+      tbody.innerHTML = '';
+      const netIncome = currentBudget.netIncome;
+      const pct = (amt) => netIncome > 0 ? ((amt / netIncome) * 100).toFixed(1) + '%' : '—';
+
+      function addRow(cells, cls) {
+        const tr = document.createElement('tr');
+        if (cls) tr.className = cls;
+        cells.forEach(({ text, cls: tdCls, colspan }) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          if (tdCls) td.className = tdCls;
+          if (colspan) td.colSpan = colspan;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      }
+
+      let totalAllocated = 0, totalSpent = 0;
+
+      currentBudget.categories.forEach(cat => {
+        const catAlloc = cat.items.reduce((s, i) => s + i.allocatedAmount, 0);
+        const catSpentAmt = cat.items.reduce((s, i) => s + itemSpent(i), 0);
+        const catRem = catAlloc - catSpentAmt;
+
+        addRow([
+          { text: cat.name, cls: 'td-category expense-cat' },
+          { text: '' },
+          { text: '' },
+          { text: fmt(catAlloc),   cls: 'td-amount' },
+          { text: fmt(catSpentAmt), cls: 'td-amount' + (catSpentAmt > catAlloc ? ' td-neg' : '') },
+          { text: (catRem < 0 ? '−' : '') + fmt(Math.abs(catRem)), cls: 'td-amount' + (catRem < 0 ? ' td-neg' : '') },
+          { text: pct(catAlloc), cls: 'td-pct' }
+        ], 'tr-category');
+
+        cat.items.forEach(item => {
+          const spent = itemSpent(item);
+          const rem   = item.allocatedAmount - spent;
+          addRow([
+            { text: '' },
+            { text: item.name, cls: 'td-item' },
+            { text: item.type === 'fixed' ? 'Fixed' : 'Variable', cls: 'td-type' },
+            { text: fmt(item.allocatedAmount), cls: 'td-amount' },
+            { text: fmt(spent), cls: 'td-amount' + (spent > item.allocatedAmount ? ' td-neg' : '') },
+            { text: (rem < 0 ? '−' : '') + fmt(Math.abs(rem)), cls: 'td-amount' + (rem < 0 ? ' td-neg' : '') },
+            { text: pct(item.allocatedAmount), cls: 'td-pct' }
+          ], 'tr-item');
+        });
+
+        totalAllocated += catAlloc;
+        totalSpent     += catSpentAmt;
+      });
+
+      // Totals row
+      const totalRem = totalAllocated - totalSpent;
+      addRow([
+        { text: 'Total Expenses', cls: 'td-total td-expense-total', colspan: 3 },
+        { text: fmt(totalAllocated),  cls: 'td-amount td-total td-expense-total' },
+        { text: fmt(totalSpent),      cls: 'td-amount td-total td-expense-total' + (totalSpent > totalAllocated ? ' td-neg' : '') },
+        { text: (totalRem < 0 ? '−' : '') + fmt(Math.abs(totalRem)), cls: 'td-amount td-total td-expense-total' + (totalRem < 0 ? ' td-neg' : '') },
+        { text: pct(totalAllocated), cls: 'td-pct td-total' }
+      ], 'tr-total tr-expense-total');
+
+      // Surplus row
+      const surplus = netIncome - totalSpent;
+      addRow([
+        { text: 'Surplus', cls: 'td-remaining', colspan: 4 },
+        { text: (surplus < 0 ? '−' : '') + fmt(Math.abs(surplus)), cls: 'td-amount td-remaining' + (surplus < 0 ? ' td-neg' : '') },
+        { text: '' },
+        { text: pct(surplus), cls: 'td-pct td-remaining' }
+      ], 'tr-remaining');
     }
 
     /* ─── Init ─── */
