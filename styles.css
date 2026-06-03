@@ -1925,13 +1925,27 @@ input::placeholder { color: var(--muted); }
 .bc-var-section:last-child { border-bottom: none; }
 .bc-var-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 10px;
   padding: 14px 18px 8px;
+  cursor: default;
+  min-height: auto;
 }
-.bc-var-amounts { font-size: 14px; color: var(--muted); flex-shrink: 0; margin-left: auto; }
+/* Name takes full width on its own line */
+.bc-var-header .item-name {
+  flex: 0 0 100%;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+/* badge + amounts + remaining sit on second line */
+.bc-var-header .item-type-badge { flex-shrink: 0; }
+.bc-var-amounts { font-size: 13px; color: var(--muted); flex-shrink: 0; margin-left: 0; }
 .bc-sep { color: var(--muted); }
-.bc-var-remaining { font-size: 14px; font-weight: 700; color: var(--income); flex-shrink: 0; }
+.bc-var-remaining { font-size: 14px; font-weight: 700; color: var(--income); flex-shrink: 0; margin-left: auto; }
 .bc-var-remaining.over { color: var(--expense); }
 .bc-var-bar { margin: 0 18px 10px; }
 
@@ -2192,6 +2206,11 @@ input::placeholder { color: var(--muted); }
   .txn-note { white-space: nowrap; text-overflow: ellipsis; }
   .txn-row { padding: 12px 22px; gap: 12px; }
   .txn-date { width: 68px; font-size: 13px; }
+
+  /* bc-var-header: inline single-row on desktop */
+  .bc-var-header { flex-wrap: nowrap; }
+  .bc-var-header .item-name { flex: 1; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bc-var-remaining { margin-left: 0; }
 
   /* Table view */
   .finance-table { font-size: 15px; }
