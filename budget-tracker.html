@@ -25,12 +25,12 @@
         <thead>
           <tr>
             <th class="th-category">Category</th>
-            <th class="th-item">Item</th>
+            <th class="th-item">Item / Date</th>
             <th class="th-type">Type</th>
+            <th class="th-item">Note / Status</th>
             <th class="th-amount">Allocated</th>
             <th class="th-amount">Spent</th>
             <th class="th-amount">Remaining</th>
-            <th class="th-pct">% of Income</th>
           </tr>
         </thead>
         <tbody id="budgetTableBody"></tbody>
@@ -402,6 +402,12 @@
       }
     }
 
+    function formatDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
     function buildTableView() {
       if (!currentBudget) return;
       const tbody = document.getElementById('budgetTableBody');
@@ -412,9 +418,9 @@
       function addRow(cells, cls) {
         const tr = document.createElement('tr');
         if (cls) tr.className = cls;
-        cells.forEach(({ text, cls: tdCls, colspan }) => {
+        cells.forEach(({ text, cls: tdCls, colspan, html }) => {
           const td = document.createElement('td');
-          td.textContent = text;
+          if (html) td.innerHTML = html; else td.textContent = text;
           if (tdCls) td.className = tdCls;
           if (colspan) td.colSpan = colspan;
           tr.appendChild(td);
@@ -425,32 +431,71 @@
       let totalAllocated = 0, totalSpent = 0;
 
       currentBudget.categories.forEach(cat => {
-        const catAlloc = cat.items.reduce((s, i) => s + i.allocatedAmount, 0);
+        const catAlloc    = cat.items.reduce((s, i) => s + i.allocatedAmount, 0);
         const catSpentAmt = cat.items.reduce((s, i) => s + itemSpent(i), 0);
-        const catRem = catAlloc - catSpentAmt;
+        const catRem      = catAlloc - catSpentAmt;
 
+        // Category header row
         addRow([
           { text: cat.name, cls: 'td-category expense-cat' },
-          { text: '' },
-          { text: '' },
-          { text: fmt(catAlloc),   cls: 'td-amount' },
+          { text: '', colspan: 3 },
+          { text: fmt(catAlloc),    cls: 'td-amount' },
           { text: fmt(catSpentAmt), cls: 'td-amount' + (catSpentAmt > catAlloc ? ' td-neg' : '') },
-          { text: (catRem < 0 ? '−' : '') + fmt(Math.abs(catRem)), cls: 'td-amount' + (catRem < 0 ? ' td-neg' : '') },
-          { text: pct(catAlloc), cls: 'td-pct' }
+          { text: (catRem < 0 ? '−' : '') + fmt(Math.abs(catRem)), cls: 'td-amount' + (catRem < 0 ? ' td-neg' : '') }
         ], 'tr-category');
 
         cat.items.forEach(item => {
           const spent = itemSpent(item);
           const rem   = item.allocatedAmount - spent;
-          addRow([
-            { text: '' },
-            { text: item.name, cls: 'td-item' },
-            { text: item.type === 'fixed' ? 'Fixed' : 'Variable', cls: 'td-type' },
-            { text: fmt(item.allocatedAmount), cls: 'td-amount' },
-            { text: fmt(spent), cls: 'td-amount' + (spent > item.allocatedAmount ? ' td-neg' : '') },
-            { text: (rem < 0 ? '−' : '') + fmt(Math.abs(rem)), cls: 'td-amount' + (rem < 0 ? ' td-neg' : '') },
-            { text: pct(item.allocatedAmount), cls: 'td-pct' }
-          ], 'tr-item');
+          const over  = spent > item.allocatedAmount;
+
+          if (item.type === 'fixed') {
+            // Fixed: single row with paid/unpaid status
+            addRow([
+              { text: '' },
+              { text: item.name, cls: 'td-item' },
+              { text: 'Fixed', cls: 'td-type' },
+              { html: item.paid
+                  ? '<span style="color:var(--income);font-weight:600">✓ Paid</span>'
+                  : '<span style="color:var(--muted)">Unpaid</span>',
+                cls: 'td-status' },
+              { text: fmt(item.allocatedAmount), cls: 'td-amount' },
+              { text: item.paid ? fmt(item.allocatedAmount) : '—', cls: 'td-amount' },
+              { text: item.paid ? '—' : fmt(item.allocatedAmount), cls: 'td-amount' + (item.paid ? '' : ' td-muted') }
+            ], 'tr-item');
+          } else {
+            // Variable: item summary row
+            addRow([
+              { text: '' },
+              { text: item.name, cls: 'td-item' },
+              { text: 'Variable', cls: 'td-type' },
+              { text: item.transactions.length + ' transaction' + (item.transactions.length !== 1 ? 's' : ''), cls: 'td-status td-muted' },
+              { text: fmt(item.allocatedAmount), cls: 'td-amount' },
+              { text: fmt(spent), cls: 'td-amount' + (over ? ' td-neg' : '') },
+              { text: (rem < 0 ? '−' : '') + fmt(Math.abs(rem)), cls: 'td-amount' + (rem < 0 ? ' td-neg' : '') }
+            ], 'tr-item');
+
+            // Individual transactions as sub-rows
+            const sorted = [...item.transactions].sort((a, b) => a.date.localeCompare(b.date));
+            sorted.forEach(txn => {
+              addRow([
+                { text: '' },
+                { text: formatDate(txn.date), cls: 'td-txn-date' },
+                { text: txn.note || '—', cls: 'td-txn-note', colspan: 2 },
+                { text: '' },
+                { text: fmt(txn.amount), cls: 'td-amount td-txn-amt' },
+                { text: '' }
+              ], 'tr-txn');
+            });
+
+            if (item.transactions.length === 0) {
+              addRow([
+                { text: '' },
+                { text: 'No transactions yet', cls: 'td-txn-note td-muted', colspan: 5 },
+                { text: '' }
+              ], 'tr-txn');
+            }
+          }
         });
 
         totalAllocated += catAlloc;
@@ -460,20 +505,25 @@
       // Totals row
       const totalRem = totalAllocated - totalSpent;
       addRow([
-        { text: 'Total Expenses', cls: 'td-total td-expense-total', colspan: 3 },
-        { text: fmt(totalAllocated),  cls: 'td-amount td-total td-expense-total' },
-        { text: fmt(totalSpent),      cls: 'td-amount td-total td-expense-total' + (totalSpent > totalAllocated ? ' td-neg' : '') },
-        { text: (totalRem < 0 ? '−' : '') + fmt(Math.abs(totalRem)), cls: 'td-amount td-total td-expense-total' + (totalRem < 0 ? ' td-neg' : '') },
-        { text: pct(totalAllocated), cls: 'td-pct td-total' }
+        { text: 'Total', cls: 'td-total td-expense-total', colspan: 4 },
+        { text: fmt(totalAllocated), cls: 'td-amount td-total td-expense-total' },
+        { text: fmt(totalSpent),     cls: 'td-amount td-total td-expense-total' + (totalSpent > totalAllocated ? ' td-neg' : '') },
+        { text: (totalRem < 0 ? '−' : '') + fmt(Math.abs(totalRem)), cls: 'td-amount td-total td-expense-total' + (totalRem < 0 ? ' td-neg' : '') }
       ], 'tr-total tr-expense-total');
 
       // Surplus row
       const surplus = netIncome - totalSpent;
       addRow([
-        { text: 'Surplus', cls: 'td-remaining', colspan: 4 },
-        { text: (surplus < 0 ? '−' : '') + fmt(Math.abs(surplus)), cls: 'td-amount td-remaining' + (surplus < 0 ? ' td-neg' : '') },
+        { text: 'Net Income', cls: 'td-remaining', colspan: 4 },
+        { text: fmt(netIncome), cls: 'td-amount td-remaining' },
         { text: '' },
-        { text: pct(surplus), cls: 'td-pct td-remaining' }
+        { text: '' }
+      ], 'tr-remaining');
+      addRow([
+        { text: 'Surplus', cls: 'td-remaining', colspan: 4 },
+        { text: '' },
+        { text: (surplus < 0 ? '−' : '') + fmt(Math.abs(surplus)), cls: 'td-amount td-remaining' + (surplus < 0 ? ' td-neg' : '') },
+        { text: '' }
       ], 'tr-remaining');
     }
 

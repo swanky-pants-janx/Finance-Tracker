@@ -354,6 +354,20 @@ input::placeholder { color: var(--muted); }
 }
 .td-remaining { color: var(--blue); }
 .td-neg { color: var(--expense) !important; }
+.td-muted { color: var(--muted) !important; }
+.td-status { font-size: 12px; }
+
+/* Transaction sub-rows in budget table */
+.tr-txn td {
+  padding: 5px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-sub);
+  font-size: 13px;
+}
+.tr-txn:last-of-type td { border-bottom: none; }
+.td-txn-date { color: var(--muted); font-size: 12px; padding-left: 28px !important; white-space: nowrap; }
+.td-txn-note { color: var(--muted); }
+.td-txn-amt  { color: var(--text); font-weight: 600; }
 
 .finance-col {
   flex: 1 1 260px;
