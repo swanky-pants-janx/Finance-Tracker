@@ -229,7 +229,7 @@ const State = {
   // Sync an existing budget month from its source plan:
   // - Updates netIncome, category names, item names, allocatedAmounts
   // - Adds new categories/items that appeared in the plan since the budget was created
-  // - Never removes existing categories/items (preserves transaction history)
+  // - Removes categories/items deleted from the plan only if they have no activity (no transactions, not paid)
   syncBudgetFromPlan: (budget) => {
     const data = State.getData();
     const plan = (budget.planId && data.plans.find(p => p.id === budget.planId)) || State.getActivePlan();
@@ -240,6 +240,28 @@ const State = {
         .reduce((ss, i) => ss + (parseFloat(i.amount) || 0), 0), 0);
     budget.netIncome = Math.round((grossIncome - calcSATax(grossIncome)) * 100) / 100;
     budget.planName = plan.name;
+
+    const activePlanCatIds = new Set(plan.expenses.categories.filter(c => !c.disabled).map(c => c.id));
+    const activePlanItemIds = new Set(
+      plan.expenses.categories.filter(c => !c.disabled)
+        .flatMap(c => c.items.filter(i => !i.disabled).map(i => i.id))
+    );
+
+    // Remove items deleted from plan that have no activity
+    for (const budgetCat of budget.categories) {
+      budgetCat.items = budgetCat.items.filter(i =>
+        !i.planItemId ||
+        activePlanItemIds.has(i.planItemId) ||
+        i.transactions.length > 0 ||
+        i.paid
+      );
+    }
+    // Remove categories deleted from plan that are now empty and had no activity
+    budget.categories = budget.categories.filter(c =>
+      !c.planCatId ||
+      activePlanCatIds.has(c.planCatId) ||
+      c.items.length > 0
+    );
 
     for (const planCat of plan.expenses.categories.filter(c => !c.disabled)) {
       let budgetCat = budget.categories.find(c => c.planCatId === planCat.id);

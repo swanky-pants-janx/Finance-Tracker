@@ -123,6 +123,11 @@
         return;
       }
 
+      // Auto-sync plan changes (new/renamed/updated items) into the budget on every load.
+      // Transactions and paid states are never touched.
+      State.syncBudgetFromPlan(currentBudget);
+      State.saveBudget(currentBudget);
+
       wrap.appendChild(renderSummaryStrip(currentBudget));
       wrap.appendChild(renderCategories(currentBudget));
       wrap.appendChild(renderDangerZone(currentBudget));
@@ -196,16 +201,6 @@
       planNote.className = 'bt-active-plan-note';
       planNote.textContent = budget.planName ? `Based on: ${budget.planName}` : '';
 
-      const syncBtn = document.createElement('button');
-      syncBtn.className = 'btn bt-sync-btn';
-      syncBtn.textContent = '↻ Sync allocations from plan';
-      syncBtn.addEventListener('click', () => {
-        if (!confirm(`Sync "${budget.planName || 'your plan'}" changes into this month?\n\nThis will update names and allocated amounts, and add any new categories or items. Your existing transactions and paid statuses won't be affected.`)) return;
-        State.syncBudgetFromPlan(budget);
-        State.saveBudget(budget);
-        renderPage();
-      });
-
       const delBtn = document.createElement('button');
       delBtn.className = 'btn bt-delete-month-btn';
       delBtn.textContent = 'Delete this month\'s budget';
@@ -215,7 +210,7 @@
         window.location.href = 'budget-hub.html';
       });
 
-      div.append(planNote, syncBtn, delBtn);
+      div.append(planNote, delBtn);
       return div;
     }
 
