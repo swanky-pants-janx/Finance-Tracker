@@ -164,6 +164,65 @@ const State = {
     State._scheduleSave();
   },
 
+  // ── Budget data ──
+
+  getBudgets: () => {
+    if (!State._cache) return [];
+    return State._cache.budgets || [];
+  },
+
+  getBudget: (monthKey) => {
+    return (State._cache?.budgets || []).find(b => b.month === monthKey) || null;
+  },
+
+  saveBudget: (budget) => {
+    if (!State._cache) State._cache = State._defaultData();
+    if (!State._cache.budgets) State._cache.budgets = [];
+    const idx = State._cache.budgets.findIndex(b => b.id === budget.id);
+    if (idx >= 0) State._cache.budgets[idx] = budget;
+    else State._cache.budgets.unshift(budget);
+    State._scheduleSave();
+  },
+
+  // Clones the active plan's expense categories into a new budget month snapshot
+  clonePlanToBudget: (monthKey) => {
+    const plan = State.getActivePlan();
+    const allCats = [...plan.income.categories, ...plan.expenses.categories];
+
+    const grossIncome = plan.income.categories
+      .filter(c => !c.disabled)
+      .reduce((s, c) => s + c.items.filter(i => !i.disabled && !i.pctMode)
+        .reduce((ss, i) => ss + (parseFloat(i.amount) || 0), 0), 0);
+    const netIncome = Math.round((grossIncome - calcSATax(grossIncome)) * 100) / 100;
+
+    const categories = plan.expenses.categories
+      .filter(c => !c.disabled)
+      .map(c => ({
+        id: State.genId(),
+        planCatId: c.id,
+        name: c.name,
+        items: c.items
+          .filter(i => !i.disabled)
+          .map(i => ({
+            id: State.genId(),
+            planItemId: i.id,
+            name: i.name,
+            allocatedAmount: State.resolveItemAmt(i, plan),
+            type: i.budgetType || 'variable',
+            paid: false,
+            transactions: []
+          }))
+      }));
+
+    return {
+      id: 'budget_' + monthKey.replace('-', '_'),
+      month: monthKey,
+      startedAt: new Date().toISOString(),
+      netIncome,
+      categories
+    };
+  },
+
   // ── Utilities ──
 
   genId: () => 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),

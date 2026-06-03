@@ -343,6 +343,25 @@
         addBtn.textContent = 'Add';
         row.appendChild(addBtn);
 
+        // Fixed / Variable toggle
+        const typeWrap = document.createElement('div');
+        typeWrap.className = 'budget-type-toggle';
+        const fixedBtn = document.createElement('button');
+        fixedBtn.type = 'button';
+        fixedBtn.className = 'type-btn';
+        fixedBtn.textContent = 'Fixed';
+        fixedBtn.title = 'Mark as a fixed payment (tick-off in budget tracker)';
+        const varBtn = document.createElement('button');
+        varBtn.type = 'button';
+        varBtn.className = 'type-btn active';
+        varBtn.textContent = 'Variable';
+        varBtn.title = 'Mark as variable spending (log individual purchases)';
+        let budgetType = 'variable';
+        fixedBtn.addEventListener('click', () => { budgetType = 'fixed'; fixedBtn.classList.add('active'); varBtn.classList.remove('active'); });
+        varBtn.addEventListener('click', () => { budgetType = 'variable'; varBtn.classList.add('active'); fixedBtn.classList.remove('active'); });
+        typeWrap.append(fixedBtn, varBtn);
+        row.appendChild(typeWrap);
+
         const save = () => {
           const name = nameInput.value.trim();
           if (!name) { nameInput.focus(); return; }
@@ -355,11 +374,11 @@
             if (isNaN(pctVal) || pctVal <= 0) { amtInput.focus(); return; }
             if (!refSelect || !refSelect.value) return;
             const [refType, refId] = refSelect.value.split(':');
-            category.items.push({ id: State.genId(), name, pctMode: true, pctValue: pctVal, refType, refId, disabled: false });
+            category.items.push({ id: State.genId(), name, pctMode: true, pctValue: pctVal, refType, refId, disabled: false, budgetType });
           } else {
             const amount = parseFloat(amtInput.value);
             if (isNaN(amount) || amount <= 0) { amtInput.focus(); return; }
-            category.items.push({ id: State.genId(), name, amount, pctMode: false, disabled: false });
+            category.items.push({ id: State.genId(), name, amount, pctMode: false, disabled: false, budgetType });
           }
 
           State.saveData(data);
@@ -513,7 +532,23 @@
       cancelBtn.className = 'btn btn-ghost';
       cancelBtn.textContent = '✕';
 
-      form.append(nameInput, modeBtn, amtInput, saveBtn, cancelBtn);
+      // Fixed / Variable toggle for edit form
+      let budgetType = item.budgetType || 'variable';
+      const typeWrapE = document.createElement('div');
+      typeWrapE.className = 'budget-type-toggle';
+      const fixedBtnE = document.createElement('button');
+      fixedBtnE.type = 'button';
+      fixedBtnE.className = 'type-btn' + (budgetType === 'fixed' ? ' active' : '');
+      fixedBtnE.textContent = 'Fixed';
+      const varBtnE = document.createElement('button');
+      varBtnE.type = 'button';
+      varBtnE.className = 'type-btn' + (budgetType === 'variable' ? ' active' : '');
+      varBtnE.textContent = 'Variable';
+      fixedBtnE.addEventListener('click', () => { budgetType = 'fixed'; fixedBtnE.classList.add('active'); varBtnE.classList.remove('active'); });
+      varBtnE.addEventListener('click', () => { budgetType = 'variable'; varBtnE.classList.add('active'); fixedBtnE.classList.remove('active'); });
+      typeWrapE.append(fixedBtnE, varBtnE);
+
+      form.append(nameInput, modeBtn, amtInput, typeWrapE, saveBtn, cancelBtn);
       refreshMode();
 
       const commit = () => {
@@ -537,6 +572,7 @@
           itm.pctMode = false; itm.amount = amount;
           delete itm.pctValue; delete itm.refType; delete itm.refId;
         }
+        itm.budgetType = budgetType;
         State.saveData(data);
         renderPage();
       };
@@ -587,10 +623,14 @@
       const toggleIcon  = item.disabled ? '▶' : '⏸';
       const toggleTitle = item.disabled ? 'Re-enable' : 'Disable';
 
+      const typeBadge = item.budgetType === 'fixed'
+        ? `<span class="item-type-badge fixed">Fixed</span>`
+        : `<span class="item-type-badge variable">Variable</span>`;
       row.innerHTML = `
         <span class="drag-handle" title="Drag to reorder">⠿</span>
         <span class="item-name">${esc(item.name)}</span>
         ${item.pctMode ? `<span class="item-pct-ref">${esc(pctLabel)}</span>` : ''}
+        ${typeBadge}
         <span class="item-amt">${amtDisplay}</span>
         <button class="item-toggle ${item.disabled ? 'is-disabled' : ''}" title="${toggleTitle}">${toggleIcon}</button>
         <button class="item-del" title="Delete">×</button>

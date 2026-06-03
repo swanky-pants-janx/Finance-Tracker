@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Budget Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-budget">
+
+  <nav class="top-nav">
+    <button class="nav-back" onclick="window.location.href='landing-page.html'">← Back</button>
+    <span class="nav-title" id="navTitle">Budget Tracker</span>
+    <div class="nav-actions">
+      <select class="month-picker" id="monthPicker"></select>
+    </div>
+  </nav>
+
+  <div class="budget-wrap" id="budgetWrap">
+    <!-- Rendered by JS -->
+  </div>
+
+  <!-- Transaction Sheet (bottom drawer) -->
+  <div class="txn-backdrop hidden" id="txnBackdrop"></div>
+  <div class="txn-sheet hidden" id="txnSheet">
+    <div class="txn-sheet-header">
+      <span class="txn-sheet-title" id="txnSheetTitle">Add Expense</span>
+      <button class="txn-sheet-close" id="txnSheetClose">✕</button>
+    </div>
+    <div class="txn-sheet-body">
+      <div class="txn-field-group">
+        <label>Amount (R)</label>
+        <input type="number" id="txnAmount" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="txn-field-group">
+        <label>Note (optional)</label>
+        <input type="text" id="txnNote" placeholder="e.g. Woolworths">
+      </div>
+      <div class="txn-field-group">
+        <label>Date</label>
+        <input type="date" id="txnDate">
+      </div>
+      <button class="btn btn-primary btn-full" id="txnSaveBtn">Add Transaction</button>
+    </div>
+    <!-- Transaction history list -->
+    <div class="txn-history" id="txnHistory"></div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const fmt = State.fmt;
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // Current budget being viewed
+    let currentBudget = null;
+    // Sheet state
+    let sheetCatId = null;
+    let sheetItemId = null;
+
+    /* ─── Month helpers ─── */
+    function monthLabel(key) {
+      const [y, m] = key.split('-');
+      return new Date(+y, +m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    }
+
+    function currentMonthKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    /* ─── Summary numbers ─── */
+    function budgetSummary(budget) {
+      let totalAllocated = 0, totalSpent = 0;
+      for (const cat of budget.categories) {
+        for (const item of cat.items) {
+          totalAllocated += item.allocatedAmount;
+          if (item.type === 'fixed') {
+            totalSpent += item.paid ? item.allocatedAmount : 0;
+          } else {
+            totalSpent += item.transactions.reduce((s, t) => s + t.amount, 0);
+          }
+        }
+      }
+      return { totalAllocated, totalSpent, surplus: budget.netIncome - totalSpent };
+    }
+
+    function itemSpent(item) {
+      if (item.type === 'fixed') return item.paid ? item.allocatedAmount : 0;
+      return item.transactions.reduce((s, t) => s + t.amount, 0);
+    }
+
+    function catSpent(cat) {
+      return cat.items.reduce((s, i) => s + itemSpent(i), 0);
+    }
+
+    function catAllocated(cat) {
+      return cat.items.reduce((s, i) => s + i.allocatedAmount, 0);
+    }
+
+    /* ─── Progress bar HTML ─── */
+    function progressBar(spent, allocated) {
+      const pct = allocated > 0 ? Math.min((spent / allocated) * 100, 100) : 0;
+      const over = spent > allocated;
+      return `
+        <div class="bt-bar-track">
+          <div class="bt-bar-fill ${over ? 'over' : ''}" style="width:${pct}%"></div>
+        </div>
+      `;
+    }
+
+    /* ─── Render month picker ─── */
+    function renderMonthPicker() {
+      const picker = document.getElementById('monthPicker');
+      picker.innerHTML = '';
+      const budgets = State.getBudgets();
+      const thisMonth = currentMonthKey();
+
+      // Always include current month
+      const months = budgets.map(b => b.month);
+      if (!months.includes(thisMonth)) months.unshift(thisMonth);
+      months.sort((a, b) => b.localeCompare(a));
+
+      months.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = monthLabel(m);
+        if (currentBudget && currentBudget.month === m) opt.selected = true;
+        picker.appendChild(opt);
+      });
+
+      picker.onchange = () => {
+        const selected = picker.value;
+        currentBudget = State.getBudget(selected);
+        renderPage();
+      };
+    }
+
+    /* ─── Main render ─── */
+    function renderPage() {
+      renderMonthPicker();
+      const wrap = document.getElementById('budgetWrap');
+      wrap.innerHTML = '';
+
+      const thisMonth = currentMonthKey();
+      const pickedMonth = document.getElementById('monthPicker').value || thisMonth;
+      currentBudget = State.getBudget(pickedMonth);
+
+      if (!currentBudget) {
+        // Show "start month" prompt
+        wrap.appendChild(renderStartPrompt(pickedMonth));
+        return;
+      }
+
+      document.getElementById('navTitle').textContent = monthLabel(currentBudget.month);
+      wrap.appendChild(renderSummaryStrip(currentBudget));
+      wrap.appendChild(renderCategories(currentBudget));
+    }
+
+    /* ─── Start prompt ─── */
+    function renderStartPrompt(monthKey) {
+      const div = document.createElement('div');
+      div.className = 'bt-start-wrap';
+      div.innerHTML = `
+        <div class="bt-start-icon">💳</div>
+        <h2>No budget for ${monthLabel(monthKey)}</h2>
+        <p>Start a new budget by cloning your current Finance Plan.<br>Your categories and allocations will be imported automatically.</p>
+        <button class="btn btn-primary" id="startMonthBtn">Start ${monthLabel(monthKey)}</button>
+      `;
+      div.querySelector('#startMonthBtn').addEventListener('click', () => {
+        const budget = State.clonePlanToBudget(monthKey);
+        State.saveBudget(budget);
+        currentBudget = budget;
+        renderPage();
+      });
+      return div;
+    }
+
+    /* ─── Summary strip ─── */
+    function renderSummaryStrip(budget) {
+      const { totalAllocated, totalSpent, surplus } = budgetSummary(budget);
+      const unallocated = budget.netIncome - totalAllocated;
+      const div = document.createElement('div');
+      div.className = 'bt-summary-strip';
+      div.innerHTML = `
+        <div class="bt-summary-stat">
+          <span class="bt-stat-label">Net Income</span>
+          <span class="bt-stat-val income">${fmt(budget.netIncome)}</span>
+        </div>
+        <div class="bt-summary-divider"></div>
+        <div class="bt-summary-stat">
+          <span class="bt-stat-label">Allocated</span>
+          <span class="bt-stat-val">${fmt(totalAllocated)}</span>
+        </div>
+        <div class="bt-summary-divider"></div>
+        <div class="bt-summary-stat">
+          <span class="bt-stat-label">Spent</span>
+          <span class="bt-stat-val expense">${fmt(totalSpent)}</span>
+        </div>
+        <div class="bt-summary-divider"></div>
+        <div class="bt-summary-stat">
+          <span class="bt-stat-label">Surplus</span>
+          <span class="bt-stat-val ${surplus < 0 ? 'expense' : 'income'}">${surplus < 0 ? '−' : ''}${fmt(Math.abs(surplus))}</span>
+        </div>
+        ${unallocated > 0 ? `
+        <div class="bt-summary-divider"></div>
+        <div class="bt-summary-stat">
+          <span class="bt-stat-label">Unallocated</span>
+          <span class="bt-stat-val blue">${fmt(unallocated)}</span>
+        </div>` : ''}
+      `;
+      return div;
+    }
+
+    /* ─── Category list ─── */
+    function renderCategories(budget) {
+      const container = document.createElement('div');
+      container.className = 'bt-cats';
+
+      if (budget.categories.length === 0) {
+        container.innerHTML = `<div class="bt-empty"><div class="bt-empty-icon">📋</div><div>No expense categories in your plan yet.</div><a href="finance-app.html" class="btn btn-ghost" style="margin-top:10px">Go to Finance Planner</a></div>`;
+        return container;
+      }
+
+      budget.categories.forEach(cat => {
+        container.appendChild(renderCategoryCard(cat, budget));
+      });
+      return container;
+    }
+
+    /* ─── Category card ─── */
+    function renderCategoryCard(cat, budget) {
+      const spent = catSpent(cat);
+      const allocated = catAllocated(cat);
+      const remaining = allocated - spent;
+      const over = remaining < 0;
+
+      const card = document.createElement('div');
+      card.className = 'bt-cat-card';
+
+      const header = document.createElement('div');
+      header.className = 'bt-cat-header';
+      header.innerHTML = `
+        <span class="bt-cat-name">${esc(cat.name)}</span>
+        <span class="bt-cat-meta">
+          <span class="bt-cat-spent ${over ? 'over' : ''}">${fmt(spent)}</span>
+          <span class="bt-cat-sep"> / </span>
+          <span class="bt-cat-alloc">${fmt(allocated)}</span>
+        </span>
+        <span class="bt-cat-remaining ${over ? 'over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
+        <span class="bt-cat-chevron">›</span>
+      `;
+
+      const barWrap = document.createElement('div');
+      barWrap.className = 'bt-cat-bar';
+      barWrap.innerHTML = progressBar(spent, allocated);
+
+      const itemsWrap = document.createElement('div');
+      itemsWrap.className = 'bt-items hidden';
+
+      cat.items.forEach(item => {
+        itemsWrap.appendChild(renderItemRow(item, cat, budget));
+      });
+
+      let expanded = false;
+      header.addEventListener('click', () => {
+        expanded = !expanded;
+        itemsWrap.classList.toggle('hidden', !expanded);
+        header.querySelector('.bt-cat-chevron').textContent = expanded ? '⌄' : '›';
+      });
+
+      card.append(header, barWrap, itemsWrap);
+      return card;
+    }
+
+    /* ─── Item row ─── */
+    function renderItemRow(item, cat, budget) {
+      const spent = itemSpent(item);
+      const remaining = item.allocatedAmount - spent;
+      const over = remaining < 0;
+
+      const row = document.createElement('div');
+      row.className = 'bt-item-row';
+      row.dataset.itemId = item.id;
+
+      if (item.type === 'fixed') {
+        row.innerHTML = `
+          <label class="bt-fixed-label">
+            <input type="checkbox" class="bt-checkbox" ${item.paid ? 'checked' : ''}>
+            <span class="bt-item-name ${item.paid ? 'paid' : ''}">${esc(item.name)}</span>
+          </label>
+          <span class="bt-item-alloc">${fmt(item.allocatedAmount)}</span>
+          <span class="bt-fixed-tag">Fixed</span>
+        `;
+        const cb = row.querySelector('.bt-checkbox');
+        cb.addEventListener('change', () => {
+          item.paid = cb.checked;
+          row.querySelector('.bt-item-name').className = 'bt-item-name' + (item.paid ? ' paid' : '');
+          State.saveBudget(budget);
+          rerenderSummary(budget);
+          rerenderCatBar(cat, budget, row.closest('.bt-cat-card'));
+        });
+      } else {
+        row.innerHTML = `
+          <div class="bt-var-top">
+            <span class="bt-item-name">${esc(item.name)}</span>
+            <span class="bt-var-amounts">
+              <span class="${over ? 'over' : ''}">${fmt(spent)}</span>
+              <span class="bt-cat-sep"> / ${fmt(item.allocatedAmount)}</span>
+            </span>
+            <span class="bt-var-remaining ${over ? 'over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
+            <button class="bt-add-btn" title="Log expense">+ Add</button>
+          </div>
+          <div class="bt-var-bar">${progressBar(spent, item.allocatedAmount)}</div>
+        `;
+        row.querySelector('.bt-add-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          openTxnSheet(item, cat, budget);
+        });
+        // Tap the item name/amounts area to see transaction history
+        row.querySelector('.bt-var-top').addEventListener('click', (e) => {
+          if (e.target.closest('.bt-add-btn')) return;
+          openTxnSheet(item, cat, budget, true);
+        });
+      }
+
+      return row;
+    }
+
+    /* ─── Re-render just the summary strip and cat bar without full page reload ─── */
+    function rerenderSummary(budget) {
+      const existing = document.querySelector('.bt-summary-strip');
+      if (existing) existing.replaceWith(renderSummaryStrip(budget));
+    }
+
+    function rerenderCatBar(cat, budget, catCard) {
+      if (!catCard) return;
+      const bar = catCard.querySelector('.bt-cat-bar');
+      const spent = catSpent(cat);
+      const allocated = catAllocated(cat);
+      const remaining = allocated - spent;
+      const over = remaining < 0;
+      if (bar) bar.innerHTML = progressBar(spent, allocated);
+      const metaSpent = catCard.querySelector('.bt-cat-spent');
+      if (metaSpent) { metaSpent.textContent = fmt(spent); metaSpent.className = 'bt-cat-spent' + (over ? ' over' : ''); }
+      const remEl = catCard.querySelector('.bt-cat-remaining');
+      if (remEl) { remEl.textContent = (over ? '−' : '') + fmt(Math.abs(remaining)); remEl.className = 'bt-cat-remaining' + (over ? ' over' : ''); }
+    }
+
+    function rerenderItemBar(item, itemRow) {
+      const spent = itemSpent(item);
+      const remaining = item.allocatedAmount - spent;
+      const over = remaining < 0;
+      const barDiv = itemRow.querySelector('.bt-var-bar');
+      if (barDiv) barDiv.innerHTML = progressBar(spent, item.allocatedAmount);
+      const amts = itemRow.querySelector('.bt-var-amounts span');
+      if (amts) { amts.textContent = fmt(spent); amts.className = over ? 'over' : ''; }
+      const remEl = itemRow.querySelector('.bt-var-remaining');
+      if (remEl) { remEl.textContent = (over ? '−' : '') + fmt(Math.abs(remaining)); remEl.className = 'bt-var-remaining' + (over ? ' over' : ''); }
+    }
+
+    /* ─── Transaction sheet ─── */
+    let sheetItem = null;
+    let sheetCat = null;
+    let sheetBudget = null;
+    let sheetItemRow = null;
+
+    function openTxnSheet(item, cat, budget, historyOnly = false) {
+      sheetItem = item;
+      sheetCat = cat;
+      sheetBudget = budget;
+      // Find the item row in the DOM
+      sheetItemRow = document.querySelector(`[data-item-id="${item.id}"]`);
+
+      document.getElementById('txnSheetTitle').textContent = item.name;
+      document.getElementById('txnAmount').value = '';
+      document.getElementById('txnNote').value = '';
+      // Default date to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('txnDate').value = today;
+
+      renderTxnHistory(item);
+
+      document.getElementById('txnBackdrop').classList.remove('hidden');
+      document.getElementById('txnSheet').classList.remove('hidden');
+      if (!historyOnly) setTimeout(() => document.getElementById('txnAmount').focus(), 100);
+    }
+
+    function closeTxnSheet() {
+      document.getElementById('txnBackdrop').classList.add('hidden');
+      document.getElementById('txnSheet').classList.add('hidden');
+      sheetItem = null; sheetCat = null; sheetBudget = null; sheetItemRow = null;
+    }
+
+    function renderTxnHistory(item) {
+      const hist = document.getElementById('txnHistory');
+      hist.innerHTML = '';
+      if (item.transactions.length === 0) {
+        hist.innerHTML = `<div class="txn-empty">No transactions yet</div>`;
+        return;
+      }
+      const sorted = [...item.transactions].sort((a, b) => b.date.localeCompare(a.date));
+      sorted.forEach(txn => {
+        const row = document.createElement('div');
+        row.className = 'txn-row';
+        row.innerHTML = `
+          <span class="txn-date">${formatDate(txn.date)}</span>
+          <span class="txn-note">${esc(txn.note || '—')}</span>
+          <span class="txn-amt">${fmt(txn.amount)}</span>
+          <button class="txn-del" data-id="${txn.id}" title="Delete">×</button>
+        `;
+        row.querySelector('.txn-del').addEventListener('click', () => {
+          item.transactions = item.transactions.filter(t => t.id !== txn.id);
+          State.saveBudget(sheetBudget);
+          renderTxnHistory(item);
+          rerenderSummary(sheetBudget);
+          rerenderCatBar(sheetCat, sheetBudget, document.querySelector('.bt-cat-card'));
+          // Re-render all item bars in the open cat
+          document.querySelectorAll('.bt-item-row').forEach(r => {
+            const iid = r.dataset.itemId;
+            if (iid === item.id) rerenderItemBar(item, r);
+          });
+        });
+        hist.appendChild(row);
+      });
+    }
+
+    function formatDate(iso) {
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    document.getElementById('txnSaveBtn').addEventListener('click', () => {
+      if (!sheetItem) return;
+      const amount = parseFloat(document.getElementById('txnAmount').value);
+      if (isNaN(amount) || amount <= 0) { document.getElementById('txnAmount').focus(); return; }
+      const note = document.getElementById('txnNote').value.trim();
+      const date = document.getElementById('txnDate').value || new Date().toISOString().split('T')[0];
+
+      sheetItem.transactions.push({ id: State.genId(), amount, note, date });
+      State.saveBudget(sheetBudget);
+
+      // Reset input
+      document.getElementById('txnAmount').value = '';
+      document.getElementById('txnNote').value = '';
+
+      renderTxnHistory(sheetItem);
+      rerenderSummary(sheetBudget);
+
+      // Update all cat bars and item bars on page
+      document.querySelectorAll('.bt-cat-card').forEach(card => {
+        const catName = card.querySelector('.bt-cat-name')?.textContent;
+        const cat = sheetBudget.categories.find(c => c.name === catName);
+        if (cat) rerenderCatBar(cat, sheetBudget, card);
+      });
+      document.querySelectorAll('.bt-item-row[data-item-id]').forEach(r => {
+        if (r.dataset.itemId === sheetItem.id) rerenderItemBar(sheetItem, r);
+      });
+    });
+
+    document.getElementById('txnSheetClose').addEventListener('click', closeTxnSheet);
+    document.getElementById('txnBackdrop').addEventListener('click', closeTxnSheet);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTxnSheet(); });
+    document.getElementById('txnAmount').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('txnSaveBtn').click(); });
+
+    /* ─── Init ─── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      currentBudget = State.getBudget(currentMonthKey());
+      renderPage();
+    });
+  </script>
+</body>
+</html>
