@@ -9,9 +9,6 @@
 <body class="page-landing">
 
   <div class="landing-wrap">
-    <div class="landing-topbar">
-      <button class="btn btn-ghost btn-sm" onclick="State.signOut()">Sign Out</button>
-    </div>
     <div class="greeting">
       <h1>Hello, <span class="name-highlight" id="userName">there</span></h1>
       <p>What would you like to work on today?</p>
@@ -51,6 +48,7 @@
         <span class="tile-badge">Soon</span>
       </div>
     </div>
+    <button class="btn btn-ghost btn-sm landing-signout" onclick="State.signOut()">Sign Out</button>
   </div>
 
   <script src="supabase-config.js"></script>

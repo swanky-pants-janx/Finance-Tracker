@@ -13,97 +13,150 @@
     <span class="nav-title" id="navTitle">Budget Tracker</span>
   </nav>
 
-  <div class="budget-wrap" id="budgetWrap">
-    <!-- Rendered by JS -->
-  </div>
-
-  <!-- Transaction Sheet (bottom drawer) -->
-  <div class="txn-backdrop hidden" id="txnBackdrop"></div>
-  <div class="txn-sheet hidden" id="txnSheet">
-    <div class="txn-sheet-header">
-      <span class="txn-sheet-title" id="txnSheetTitle">Add Expense</span>
-      <button class="txn-sheet-close" id="txnSheetClose">✕</button>
-    </div>
-    <div class="txn-sheet-body">
-      <div class="txn-field-group">
-        <label>Amount (R)</label>
-        <input type="number" id="txnAmount" min="0" step="0.01" placeholder="0.00">
-      </div>
-      <div class="txn-field-group">
-        <label>Note (optional)</label>
-        <input type="text" id="txnNote" placeholder="e.g. Woolworths">
-      </div>
-      <div class="txn-field-group">
-        <label>Date</label>
-        <input type="date" id="txnDate">
-      </div>
-      <button class="btn btn-primary btn-full" id="txnSaveBtn">Add Transaction</button>
-    </div>
-    <!-- Transaction history list -->
-    <div class="txn-history" id="txnHistory"></div>
-  </div>
+  <div class="budget-wrap" id="budgetWrap"></div>
 
   <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
   <script>
     const fmt = State.fmt;
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-    // Current budget being viewed
     let currentBudget = null;
-    // Sheet state
-    let sheetCatId = null;
-    let sheetItemId = null;
 
-    /* ─── Month helpers ─── */
+    /* ─── Helpers ─── */
     function monthLabel(key) {
       const [y, m] = key.split('-');
       return new Date(+y, +m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
     }
-
     function monthKeyFromUrl() {
       return new URLSearchParams(window.location.search).get('month') || '';
     }
+    function itemSpent(item) {
+      if (item.type === 'fixed') return item.paid ? item.allocatedAmount : 0;
+      return item.transactions.reduce((s, t) => s + t.amount, 0);
+    }
+    function catSpent(cat) { return cat.items.reduce((s, i) => s + itemSpent(i), 0); }
+    function catAllocated(cat) { return cat.items.reduce((s, i) => s + i.allocatedAmount, 0); }
 
     /* ─── Summary numbers ─── */
     function budgetSummary(budget) {
       let totalAllocated = 0, totalSpent = 0;
       for (const cat of budget.categories) {
-        for (const item of cat.items) {
-          totalAllocated += item.allocatedAmount;
-          if (item.type === 'fixed') {
-            totalSpent += item.paid ? item.allocatedAmount : 0;
-          } else {
-            totalSpent += item.transactions.reduce((s, t) => s + t.amount, 0);
-          }
-        }
+        totalAllocated += catAllocated(cat);
+        totalSpent     += catSpent(cat);
       }
       return { totalAllocated, totalSpent, surplus: budget.netIncome - totalSpent };
     }
 
-    function itemSpent(item) {
-      if (item.type === 'fixed') return item.paid ? item.allocatedAmount : 0;
-      return item.transactions.reduce((s, t) => s + t.amount, 0);
-    }
+    /* ─── Chart ─── */
+    const COLORS = ['#7c6af5','#58a6ff','#f85149','#3fb950','#fb923c','#a78bfa','#38bdf8','#fbbf24','#4ade80','#f472b6'];
+    const REMAINING_COLOR = '#3d5a80';
+    let summaryChart = null;
 
-    function catSpent(cat) {
-      return cat.items.reduce((s, i) => s + itemSpent(i), 0);
-    }
+    function renderChart(budget) {
+      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
 
-    function catAllocated(cat) {
-      return cat.items.reduce((s, i) => s + i.allocatedAmount, 0);
-    }
+      const { totalSpent, surplus } = budgetSummary(budget);
+      const cats = budget.categories.filter(c => catAllocated(c) > 0);
 
-    /* ─── Progress bar HTML ─── */
-    function progressBar(spent, allocated) {
-      const pct = allocated > 0 ? Math.min((spent / allocated) * 100, 100) : 0;
-      const over = spent > allocated;
-      return `
-        <div class="bt-bar-track">
-          <div class="bt-bar-fill ${over ? 'over' : ''}" style="width:${pct}%"></div>
-        </div>
-      `;
+      const chartBox   = document.getElementById('btChartBox');
+      const chartEmpty = document.getElementById('btChartEmpty');
+
+      if (cats.length === 0) {
+        chartBox.classList.add('hidden');
+        chartEmpty.classList.remove('hidden');
+        document.getElementById('btChartLegend').innerHTML = '';
+        return;
+      }
+      chartBox.classList.remove('hidden');
+      chartEmpty.classList.add('hidden');
+
+      const values   = cats.map(c => catAllocated(c));
+      const remVal   = Math.max(0, budget.netIncome - cats.reduce((s, c) => s + catAllocated(c), 0));
+      const labels   = [...cats.map(c => c.name), 'Unallocated'];
+      const allVals  = [...values, remVal];
+      const bgColors = [...COLORS.slice(0, cats.length), REMAINING_COLOR];
+
+      const chartVals = allVals.every(v => v === 0) ? allVals.map((_, i) => i === allVals.length - 1 ? 1 : 0) : allVals;
+
+      Chart.defaults.color = '#7d8a9e';
+      summaryChart = new Chart(document.getElementById('btChart'), {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: chartVals,
+            backgroundColor: bgColors,
+            borderColor: '#161b27',
+            borderWidth: 2,
+            hoverOffset: 18
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          cutout: '62%',
+          layout: { padding: 16 },
+          onClick: (event, elements) => {
+            if (!elements.length) return;
+            const idx = elements[0].index;
+            if (idx < cats.length) {
+              window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cats[idx].id}`;
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  if (ctx.label === 'Unallocated') {
+                    const pct = budget.netIncome > 0 ? ((remVal / budget.netIncome) * 100).toFixed(1) : 0;
+                    return ` ${fmt(remVal)}  (${pct}% of income)`;
+                  }
+                  const cat   = cats[ctx.dataIndex];
+                  const spent = catSpent(cat);
+                  const alloc = catAllocated(cat);
+                  return ` Spent: ${fmt(spent)}  /  ${fmt(alloc)}`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Legend
+      const legend = document.getElementById('btChartLegend');
+      legend.innerHTML = '';
+      cats.forEach((cat, i) => {
+        const alloc = catAllocated(cat);
+        const pct   = budget.netIncome > 0 ? ((alloc / budget.netIncome) * 100).toFixed(1) : 0;
+        const el    = document.createElement('div');
+        el.className    = 'leg-item';
+        el.style.cursor = 'pointer';
+        el.title = 'Click to open category';
+        el.innerHTML = `
+          <div class="leg-dot" style="background:${COLORS[i % COLORS.length]}"></div>
+          <span class="leg-name">${esc(cat.name)}</span>
+          <span class="leg-pct">${pct}%</span>
+        `;
+        el.addEventListener('click', () => {
+          window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cat.id}`;
+        });
+        legend.appendChild(el);
+      });
+
+      if (remVal > 0) {
+        const remPct = budget.netIncome > 0 ? ((remVal / budget.netIncome) * 100).toFixed(1) : 0;
+        const remEl  = document.createElement('div');
+        remEl.className = 'leg-item';
+        remEl.innerHTML = `
+          <div class="leg-dot" style="background:${REMAINING_COLOR}"></div>
+          <span class="leg-name">Unallocated</span>
+          <span class="leg-pct">${remPct}%</span>
+        `;
+        legend.appendChild(remEl);
+      }
     }
 
     /* ─── Main render ─── */
@@ -123,14 +176,159 @@
         return;
       }
 
-      // Auto-sync plan changes (new/renamed/updated items) into the budget on every load.
-      // Transactions and paid states are never touched.
+      // Auto-sync plan changes into budget on every load
       State.syncBudgetFromPlan(currentBudget);
       State.saveBudget(currentBudget);
 
-      wrap.appendChild(renderSummaryStrip(currentBudget));
-      wrap.appendChild(renderCategories(currentBudget));
-      wrap.appendChild(renderDangerZone(currentBudget));
+      // Three-column layout matching finance-app structure
+      const board = document.createElement('div');
+      board.className = 'bt-board';
+
+      // Left: categories list
+      const catsCol = document.createElement('div');
+      catsCol.className = 'bt-col bt-cats-col';
+      catsCol.innerHTML = `
+        <div class="col-header">
+          <div class="col-label expense-label">Categories</div>
+          <div class="col-total expense-total">${fmt(currentBudget.categories.reduce((s, c) => s + catAllocated(c), 0))}</div>
+        </div>
+        <div class="col-scroll" id="catsScroll"></div>
+      `;
+
+      // Middle: summary stats
+      const statsCol = document.createElement('div');
+      statsCol.className = 'bt-col bt-stats-col';
+      const { totalAllocated, totalSpent, surplus } = budgetSummary(currentBudget);
+      const unallocated = currentBudget.netIncome - totalAllocated;
+      statsCol.innerHTML = `
+        <div class="col-header">
+          <div class="col-label">Surplus</div>
+          <div class="remaining-amt${surplus < 0 ? ' neg' : ''}">${surplus < 0 ? '−' : ''}${fmt(Math.abs(surplus))}</div>
+        </div>
+        <div class="bt-stats-body">
+          <div class="bt-stat-row">
+            <span class="bt-stat-label">Net Income</span>
+            <span class="bt-stat-val income">${fmt(currentBudget.netIncome)}</span>
+          </div>
+          <div class="bt-stat-row">
+            <span class="bt-stat-label">Allocated</span>
+            <span class="bt-stat-val">${fmt(totalAllocated)}</span>
+          </div>
+          <div class="bt-stat-row">
+            <span class="bt-stat-label">Spent</span>
+            <span class="bt-stat-val expense">${fmt(totalSpent)}</span>
+          </div>
+          ${unallocated > 0 ? `
+          <div class="bt-stat-row">
+            <span class="bt-stat-label">Unallocated</span>
+            <span class="bt-stat-val blue">${fmt(unallocated)}</span>
+          </div>` : ''}
+        </div>
+        ${renderDangerZone(currentBudget).outerHTML}
+      `;
+
+      // Right: pie chart
+      const chartCol = document.createElement('div');
+      chartCol.className = 'bt-col bt-chart-col';
+      chartCol.innerHTML = `
+        <div class="summary-top col-header">
+          <div class="col-label">Budget split</div>
+        </div>
+        <div class="summary-bottom">
+          <div id="btChartBox"><canvas id="btChart"></canvas></div>
+          <div id="btChartEmpty" class="empty-chart hidden">
+            <div class="empty-chart-icon">🥧</div>
+            <div>Add categories to see the breakdown</div>
+          </div>
+          <div class="chart-legend" id="btChartLegend"></div>
+        </div>
+      `;
+
+      board.append(catsCol, statsCol, chartCol);
+      wrap.appendChild(board);
+
+      // Render category cards
+      renderCategoryCards(currentBudget, document.getElementById('catsScroll'));
+
+      // Render chart
+      renderChart(currentBudget);
+
+      // Re-wire danger zone buttons (innerHTML loses event listeners)
+      wrap.querySelector('.bt-delete-month-btn')?.addEventListener('click', () => {
+        if (!confirm(`Delete the budget for ${monthLabel(currentBudget.month)}? This will erase all transactions and cannot be undone.`)) return;
+        State.deleteBudget(currentBudget.id);
+        window.location.href = 'budget-hub.html';
+      });
+    }
+
+    /* ─── Category cards ─── */
+    function renderCategoryCards(budget, container) {
+      container.innerHTML = '';
+      if (budget.categories.length === 0) {
+        container.innerHTML = `<div class="empty-items" style="padding:24px"><div class="empty-items-icon">📋</div><div>No expense categories yet</div><a href="finance-plans.html" class="btn btn-ghost" style="margin-top:10px">Go to Finance Planner</a></div>`;
+        return;
+      }
+      budget.categories.forEach((cat, i) => {
+        container.appendChild(makeCategoryCard(cat, budget, i));
+      });
+    }
+
+    function makeCategoryCard(cat, budget, colorIdx) {
+      const spent = catSpent(cat);
+      const alloc = catAllocated(cat);
+      const remaining = alloc - spent;
+      const over = remaining < 0;
+      const pct = alloc > 0 ? Math.min((spent / alloc) * 100, 100) : 0;
+
+      const card = document.createElement('div');
+      card.className = 'cat-card bt-cat-nav-card';
+      card.style.setProperty('--cat-color', COLORS[colorIdx % COLORS.length]);
+
+      card.innerHTML = `
+        <span class="bt-cat-color-bar"></span>
+        <span class="card-name">${esc(cat.name)}</span>
+        <span class="card-amt${over ? ' over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
+        <span class="bt-cat-nav-arrow">›</span>
+      `;
+
+      // Progress bar under the card
+      const barWrap = document.createElement('div');
+      barWrap.className = 'bt-cat-nav-bar';
+      barWrap.innerHTML = `
+        <div class="bt-bar-track">
+          <div class="bt-bar-fill${over ? ' over' : ''}" style="width:${pct}%"></div>
+        </div>
+        <div class="bt-cat-nav-meta">
+          <span class="${over ? 'over' : 'expense'}">${fmt(spent)} spent</span>
+          <span style="color:var(--muted)"> / ${fmt(alloc)}</span>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cat.id}`;
+      });
+
+      const wrap = document.createElement('div');
+      wrap.className = 'bt-cat-card-wrap';
+      wrap.append(card, barWrap);
+      return wrap;
+    }
+
+    /* ─── Danger zone ─── */
+    function renderDangerZone(budget) {
+      const div = document.createElement('div');
+      div.className = 'bt-danger-zone';
+
+      const planNote = document.createElement('div');
+      planNote.className = 'bt-active-plan-note';
+      planNote.textContent = budget.planName ? `Based on: ${budget.planName}` : '';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn bt-delete-month-btn';
+      delBtn.textContent = 'Delete this month\'s budget';
+
+      div.append(planNote, delBtn);
+      return div;
     }
 
     /* ─── Start prompt ─── */
@@ -147,15 +345,13 @@
       h2.textContent = `No budget for ${monthLabel(monthKey)}`;
 
       const p = document.createElement('p');
-      p.textContent = 'Choose a Finance Plan to base this month\'s budget on. Your categories and allocations will be imported automatically.';
+      p.textContent = 'Choose a Finance Plan to base this month\'s budget on.';
 
-      // Plan selector (only show if more than one plan)
       let planSelect = null;
       if (plans.length > 1) {
         const label = document.createElement('div');
         label.className = 'bt-plan-label';
         label.textContent = 'Finance Plan';
-
         planSelect = document.createElement('select');
         planSelect.className = 'bt-plan-select';
         plans.forEach(pl => {
@@ -165,10 +361,8 @@
           if (pl.id === State.getData().activePlanId) opt.selected = true;
           planSelect.appendChild(opt);
         });
-
         div.append(icon, h2, p, label, planSelect);
       } else {
-        // Single plan — show its name as a subtle note
         const planNote = document.createElement('div');
         planNote.className = 'bt-plan-note';
         planNote.textContent = plans.length > 0 ? `Plan: ${plans[0].name}` : 'No plan found';
@@ -185,316 +379,11 @@
         const budget = State.clonePlanToBudget(monthKey, planId);
         State.saveBudget(budget);
         currentBudget = budget;
-        // Flush save before re-render so data is in cache
         renderPage();
       });
 
       return div;
     }
-
-    /* ─── Danger zone (delete / sync month) ─── */
-    function renderDangerZone(budget) {
-      const div = document.createElement('div');
-      div.className = 'bt-danger-zone';
-
-      const planNote = document.createElement('div');
-      planNote.className = 'bt-active-plan-note';
-      planNote.textContent = budget.planName ? `Based on: ${budget.planName}` : '';
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn bt-delete-month-btn';
-      delBtn.textContent = 'Delete this month\'s budget';
-      delBtn.addEventListener('click', () => {
-        if (!confirm(`Delete the budget for ${monthLabel(budget.month)}? This will erase all transactions and cannot be undone.`)) return;
-        State.deleteBudget(budget.id);
-        window.location.href = 'budget-hub.html';
-      });
-
-      div.append(planNote, delBtn);
-      return div;
-    }
-
-    /* ─── Summary strip ─── */
-    function renderSummaryStrip(budget) {
-      const { totalAllocated, totalSpent, surplus } = budgetSummary(budget);
-      const unallocated = budget.netIncome - totalAllocated;
-      const div = document.createElement('div');
-      div.className = 'bt-summary-strip';
-      div.innerHTML = `
-        <div class="bt-summary-stat">
-          <span class="bt-stat-label">Net Income</span>
-          <span class="bt-stat-val income">${fmt(budget.netIncome)}</span>
-        </div>
-        <div class="bt-summary-divider"></div>
-        <div class="bt-summary-stat">
-          <span class="bt-stat-label">Spent</span>
-          <span class="bt-stat-val expense">${fmt(totalSpent)}</span>
-        </div>
-        <div class="bt-summary-divider"></div>
-        <div class="bt-summary-stat">
-          <span class="bt-stat-label">Surplus</span>
-          <span class="bt-stat-val ${surplus < 0 ? 'expense' : 'income'}">${surplus < 0 ? '−' : ''}${fmt(Math.abs(surplus))}</span>
-        </div>
-        ${unallocated > 0 ? `
-        <div class="bt-summary-divider"></div>
-        <div class="bt-summary-stat">
-          <span class="bt-stat-label">Unallocated</span>
-          <span class="bt-stat-val blue">${fmt(unallocated)}</span>
-        </div>` : ''}
-      `;
-      return div;
-    }
-
-    /* ─── Category list ─── */
-    function renderCategories(budget) {
-      const container = document.createElement('div');
-      container.className = 'bt-cats';
-
-      if (budget.categories.length === 0) {
-        container.innerHTML = `<div class="bt-empty"><div class="bt-empty-icon">📋</div><div>No expense categories in your plan yet.</div><a href="finance-app.html" class="btn btn-ghost" style="margin-top:10px">Go to Finance Planner</a></div>`;
-        return container;
-      }
-
-      budget.categories.forEach(cat => {
-        container.appendChild(renderCategoryCard(cat, budget));
-      });
-      return container;
-    }
-
-    /* ─── Category card ─── */
-    function renderCategoryCard(cat, budget) {
-      const spent = catSpent(cat);
-      const allocated = catAllocated(cat);
-      const remaining = allocated - spent;
-      const over = remaining < 0;
-
-      const card = document.createElement('div');
-      card.className = 'bt-cat-card';
-
-      const header = document.createElement('div');
-      header.className = 'bt-cat-header';
-      header.innerHTML = `
-        <span class="bt-cat-name">${esc(cat.name)}</span>
-        <span class="bt-cat-meta">
-          <span class="bt-cat-spent ${over ? 'over' : ''}">${fmt(spent)}</span>
-          <span class="bt-cat-sep"> / </span>
-          <span class="bt-cat-alloc">${fmt(allocated)}</span>
-        </span>
-        <span class="bt-cat-remaining ${over ? 'over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
-        <span class="bt-cat-chevron">›</span>
-      `;
-
-      const barWrap = document.createElement('div');
-      barWrap.className = 'bt-cat-bar';
-      barWrap.innerHTML = progressBar(spent, allocated);
-
-      const itemsWrap = document.createElement('div');
-      itemsWrap.className = 'bt-items hidden';
-
-      cat.items.forEach(item => {
-        itemsWrap.appendChild(renderItemRow(item, cat, budget));
-      });
-
-      let expanded = false;
-      header.addEventListener('click', () => {
-        expanded = !expanded;
-        itemsWrap.classList.toggle('hidden', !expanded);
-        header.querySelector('.bt-cat-chevron').textContent = expanded ? '⌄' : '›';
-      });
-
-      card.append(header, barWrap, itemsWrap);
-      return card;
-    }
-
-    /* ─── Item row ─── */
-    function renderItemRow(item, cat, budget) {
-      const spent = itemSpent(item);
-      const remaining = item.allocatedAmount - spent;
-      const over = remaining < 0;
-
-      const row = document.createElement('div');
-      row.className = 'bt-item-row';
-      row.dataset.itemId = item.id;
-
-      if (item.type === 'fixed') {
-        row.innerHTML = `
-          <label class="bt-fixed-label">
-            <input type="checkbox" class="bt-checkbox" ${item.paid ? 'checked' : ''}>
-            <span class="bt-item-name ${item.paid ? 'paid' : ''}">${esc(item.name)}</span>
-          </label>
-          <span class="bt-item-alloc">${fmt(item.allocatedAmount)}</span>
-          <span class="bt-fixed-tag">Fixed</span>
-        `;
-        const cb = row.querySelector('.bt-checkbox');
-        cb.addEventListener('change', () => {
-          item.paid = cb.checked;
-          row.querySelector('.bt-item-name').className = 'bt-item-name' + (item.paid ? ' paid' : '');
-          State.saveBudget(budget);
-          rerenderSummary(budget);
-          rerenderCatBar(cat, budget, row.closest('.bt-cat-card'));
-        });
-      } else {
-        row.innerHTML = `
-          <div class="bt-var-top">
-            <span class="bt-item-name">${esc(item.name)}</span>
-            <span class="bt-var-amounts">
-              <span class="${over ? 'over' : ''}">${fmt(spent)}</span>
-              <span class="bt-cat-sep"> / ${fmt(item.allocatedAmount)}</span>
-            </span>
-            <span class="bt-var-remaining ${over ? 'over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
-            <button class="bt-add-btn" title="Log expense">+ Add</button>
-          </div>
-          <div class="bt-var-bar">${progressBar(spent, item.allocatedAmount)}</div>
-        `;
-        row.querySelector('.bt-add-btn').addEventListener('click', (e) => {
-          e.stopPropagation();
-          openTxnSheet(item, cat, budget);
-        });
-        // Tap the item name/amounts area to see transaction history
-        row.querySelector('.bt-var-top').addEventListener('click', (e) => {
-          if (e.target.closest('.bt-add-btn')) return;
-          openTxnSheet(item, cat, budget, true);
-        });
-      }
-
-      return row;
-    }
-
-    /* ─── Re-render just the summary strip and cat bar without full page reload ─── */
-    function rerenderSummary(budget) {
-      const existing = document.querySelector('.bt-summary-strip');
-      if (existing) existing.replaceWith(renderSummaryStrip(budget));
-    }
-
-    function rerenderCatBar(cat, budget, catCard) {
-      if (!catCard) return;
-      const bar = catCard.querySelector('.bt-cat-bar');
-      const spent = catSpent(cat);
-      const allocated = catAllocated(cat);
-      const remaining = allocated - spent;
-      const over = remaining < 0;
-      if (bar) bar.innerHTML = progressBar(spent, allocated);
-      const metaSpent = catCard.querySelector('.bt-cat-spent');
-      if (metaSpent) { metaSpent.textContent = fmt(spent); metaSpent.className = 'bt-cat-spent' + (over ? ' over' : ''); }
-      const remEl = catCard.querySelector('.bt-cat-remaining');
-      if (remEl) { remEl.textContent = (over ? '−' : '') + fmt(Math.abs(remaining)); remEl.className = 'bt-cat-remaining' + (over ? ' over' : ''); }
-    }
-
-    function rerenderItemBar(item, itemRow) {
-      const spent = itemSpent(item);
-      const remaining = item.allocatedAmount - spent;
-      const over = remaining < 0;
-      const barDiv = itemRow.querySelector('.bt-var-bar');
-      if (barDiv) barDiv.innerHTML = progressBar(spent, item.allocatedAmount);
-      const amts = itemRow.querySelector('.bt-var-amounts span');
-      if (amts) { amts.textContent = fmt(spent); amts.className = over ? 'over' : ''; }
-      const remEl = itemRow.querySelector('.bt-var-remaining');
-      if (remEl) { remEl.textContent = (over ? '−' : '') + fmt(Math.abs(remaining)); remEl.className = 'bt-var-remaining' + (over ? ' over' : ''); }
-    }
-
-    /* ─── Transaction sheet ─── */
-    let sheetItem = null;
-    let sheetCat = null;
-    let sheetBudget = null;
-    let sheetItemRow = null;
-
-    function openTxnSheet(item, cat, budget, historyOnly = false) {
-      sheetItem = item;
-      sheetCat = cat;
-      sheetBudget = budget;
-      // Find the item row in the DOM
-      sheetItemRow = document.querySelector(`[data-item-id="${item.id}"]`);
-
-      document.getElementById('txnSheetTitle').textContent = item.name;
-      document.getElementById('txnAmount').value = '';
-      document.getElementById('txnNote').value = '';
-      // Default date to today
-      const today = new Date().toISOString().split('T')[0];
-      document.getElementById('txnDate').value = today;
-
-      renderTxnHistory(item);
-
-      document.getElementById('txnBackdrop').classList.remove('hidden');
-      document.getElementById('txnSheet').classList.remove('hidden');
-      if (!historyOnly) setTimeout(() => document.getElementById('txnAmount').focus(), 100);
-    }
-
-    function closeTxnSheet() {
-      document.getElementById('txnBackdrop').classList.add('hidden');
-      document.getElementById('txnSheet').classList.add('hidden');
-      sheetItem = null; sheetCat = null; sheetBudget = null; sheetItemRow = null;
-    }
-
-    function renderTxnHistory(item) {
-      const hist = document.getElementById('txnHistory');
-      hist.innerHTML = '';
-      if (item.transactions.length === 0) {
-        hist.innerHTML = `<div class="txn-empty">No transactions yet</div>`;
-        return;
-      }
-      const sorted = [...item.transactions].sort((a, b) => b.date.localeCompare(a.date));
-      sorted.forEach(txn => {
-        const row = document.createElement('div');
-        row.className = 'txn-row';
-        row.innerHTML = `
-          <span class="txn-date">${formatDate(txn.date)}</span>
-          <span class="txn-note">${esc(txn.note || '—')}</span>
-          <span class="txn-amt">${fmt(txn.amount)}</span>
-          <button class="txn-del" data-id="${txn.id}" title="Delete">×</button>
-        `;
-        row.querySelector('.txn-del').addEventListener('click', () => {
-          item.transactions = item.transactions.filter(t => t.id !== txn.id);
-          State.saveBudget(sheetBudget);
-          renderTxnHistory(item);
-          rerenderSummary(sheetBudget);
-          rerenderCatBar(sheetCat, sheetBudget, document.querySelector('.bt-cat-card'));
-          // Re-render all item bars in the open cat
-          document.querySelectorAll('.bt-item-row').forEach(r => {
-            const iid = r.dataset.itemId;
-            if (iid === item.id) rerenderItemBar(item, r);
-          });
-        });
-        hist.appendChild(row);
-      });
-    }
-
-    function formatDate(iso) {
-      const [y, m, d] = iso.split('-');
-      return `${d}/${m}/${y}`;
-    }
-
-    document.getElementById('txnSaveBtn').addEventListener('click', () => {
-      if (!sheetItem) return;
-      const amount = parseFloat(document.getElementById('txnAmount').value);
-      if (isNaN(amount) || amount <= 0) { document.getElementById('txnAmount').focus(); return; }
-      const note = document.getElementById('txnNote').value.trim();
-      const date = document.getElementById('txnDate').value || new Date().toISOString().split('T')[0];
-
-      sheetItem.transactions.push({ id: State.genId(), amount, note, date });
-      State.saveBudget(sheetBudget);
-
-      // Reset input
-      document.getElementById('txnAmount').value = '';
-      document.getElementById('txnNote').value = '';
-
-      renderTxnHistory(sheetItem);
-      rerenderSummary(sheetBudget);
-
-      // Update all cat bars and item bars on page
-      document.querySelectorAll('.bt-cat-card').forEach(card => {
-        const catName = card.querySelector('.bt-cat-name')?.textContent;
-        const cat = sheetBudget.categories.find(c => c.name === catName);
-        if (cat) rerenderCatBar(cat, sheetBudget, card);
-      });
-      document.querySelectorAll('.bt-item-row[data-item-id]').forEach(r => {
-        if (r.dataset.itemId === sheetItem.id) rerenderItemBar(sheetItem, r);
-      });
-    });
-
-    document.getElementById('txnSheetClose').addEventListener('click', closeTxnSheet);
-    document.getElementById('txnBackdrop').addEventListener('click', closeTxnSheet);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTxnSheet(); });
-    document.getElementById('txnAmount').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('txnSaveBtn').click(); });
 
     /* ─── Init ─── */
     document.addEventListener('DOMContentLoaded', async () => {
