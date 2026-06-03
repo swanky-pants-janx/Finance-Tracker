@@ -1562,9 +1562,29 @@ input::placeholder { color: var(--muted); }
 .bt-fixed-label { flex: 1; }
 .bt-checkbox {
   width: 22px; height: 22px;
-  accent-color: var(--accent);
-  cursor: pointer;
   flex-shrink: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--surface-3);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  transition: background .15s, border-color .15s;
+  position: relative;
+}
+.bt-checkbox:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.bt-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px; top: 2px;
+  width: 7px; height: 11px;
+  border: 2.5px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
 }
 .bt-item-name { font-size: 15px; font-weight: 500; flex: 1; }
 .bt-item-name.paid { color: var(--muted); text-decoration: line-through; }
