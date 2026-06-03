@@ -185,8 +185,9 @@ const State = {
   },
 
   // Clones the active plan's expense categories into a new budget month snapshot
-  clonePlanToBudget: (monthKey) => {
-    const plan = State.getActivePlan();
+  clonePlanToBudget: (monthKey, planId) => {
+    const data = State.getData();
+    const plan = (planId && data.plans.find(p => p.id === planId)) || State.getActivePlan();
     const allCats = [...plan.income.categories, ...plan.expenses.categories];
 
     const grossIncome = plan.income.categories
@@ -218,9 +219,17 @@ const State = {
       id: 'budget_' + monthKey.replace('-', '_'),
       month: monthKey,
       startedAt: new Date().toISOString(),
+      planId: plan.id,
+      planName: plan.name,
       netIncome,
       categories
     };
+  },
+
+  deleteBudget: (budgetId) => {
+    if (!State._cache?.budgets) return;
+    State._cache.budgets = State._cache.budgets.filter(b => b.id !== budgetId);
+    State._scheduleSave();
   },
 
   // ── Utilities ──

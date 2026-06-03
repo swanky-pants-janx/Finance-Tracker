@@ -163,24 +163,87 @@
       document.getElementById('navTitle').textContent = monthLabel(currentBudget.month);
       wrap.appendChild(renderSummaryStrip(currentBudget));
       wrap.appendChild(renderCategories(currentBudget));
+      wrap.appendChild(renderDangerZone(currentBudget));
     }
 
     /* ─── Start prompt ─── */
     function renderStartPrompt(monthKey) {
+      const plans = State.getData().plans || [];
       const div = document.createElement('div');
       div.className = 'bt-start-wrap';
-      div.innerHTML = `
-        <div class="bt-start-icon">💳</div>
-        <h2>No budget for ${monthLabel(monthKey)}</h2>
-        <p>Start a new budget by cloning your current Finance Plan.<br>Your categories and allocations will be imported automatically.</p>
-        <button class="btn btn-primary" id="startMonthBtn">Start ${monthLabel(monthKey)}</button>
-      `;
-      div.querySelector('#startMonthBtn').addEventListener('click', () => {
-        const budget = State.clonePlanToBudget(monthKey);
+
+      const icon = document.createElement('div');
+      icon.className = 'bt-start-icon';
+      icon.textContent = '💳';
+
+      const h2 = document.createElement('h2');
+      h2.textContent = `No budget for ${monthLabel(monthKey)}`;
+
+      const p = document.createElement('p');
+      p.textContent = 'Choose a Finance Plan to base this month\'s budget on. Your categories and allocations will be imported automatically.';
+
+      // Plan selector (only show if more than one plan)
+      let planSelect = null;
+      if (plans.length > 1) {
+        const label = document.createElement('div');
+        label.className = 'bt-plan-label';
+        label.textContent = 'Finance Plan';
+
+        planSelect = document.createElement('select');
+        planSelect.className = 'bt-plan-select';
+        plans.forEach(pl => {
+          const opt = document.createElement('option');
+          opt.value = pl.id;
+          opt.textContent = pl.name;
+          if (pl.id === State.getData().activePlanId) opt.selected = true;
+          planSelect.appendChild(opt);
+        });
+
+        div.append(icon, h2, p, label, planSelect);
+      } else {
+        // Single plan — show its name as a subtle note
+        const planNote = document.createElement('div');
+        planNote.className = 'bt-plan-note';
+        planNote.textContent = plans.length > 0 ? `Plan: ${plans[0].name}` : 'No plan found';
+        div.append(icon, h2, p, planNote);
+      }
+
+      const startBtn = document.createElement('button');
+      startBtn.className = 'btn btn-primary';
+      startBtn.textContent = `Start ${monthLabel(monthKey)}`;
+      div.appendChild(startBtn);
+
+      startBtn.addEventListener('click', () => {
+        const planId = planSelect ? planSelect.value : (plans[0]?.id);
+        const budget = State.clonePlanToBudget(monthKey, planId);
         State.saveBudget(budget);
         currentBudget = budget;
         renderPage();
       });
+
+      return div;
+    }
+
+    /* ─── Danger zone (delete month) ─── */
+    function renderDangerZone(budget) {
+      const div = document.createElement('div');
+      div.className = 'bt-danger-zone';
+
+      const planNote = document.createElement('div');
+      planNote.className = 'bt-active-plan-note';
+      planNote.textContent = budget.planName ? `Based on: ${budget.planName}` : '';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn bt-delete-month-btn';
+      delBtn.textContent = 'Delete this month\'s budget';
+      delBtn.addEventListener('click', () => {
+        if (!confirm(`Delete the budget for ${monthLabel(budget.month)}? This will erase all transactions and cannot be undone.`)) return;
+        State.deleteBudget(budget.id);
+        currentBudget = null;
+        renderPage();
+      });
+
+      div.append(planNote, delBtn);
       return div;
     }
 

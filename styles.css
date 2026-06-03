@@ -1609,6 +1609,68 @@ input::placeholder { color: var(--muted); }
 .txn-row:hover .txn-del { opacity: 1; }
 .txn-del:hover { background: var(--expense-bg); }
 
+/* ── Plan selector on start prompt ── */
+.bt-plan-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.bt-plan-select {
+  width: 100%;
+  max-width: 320px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  padding: 10px 13px;
+  outline: none;
+  cursor: pointer;
+}
+.bt-plan-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.bt-plan-note {
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 14px;
+}
+
+/* ── Danger zone (delete month) ── */
+.bt-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-top: 4px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bt-active-plan-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+.bt-delete-month-btn {
+  background: transparent;
+  border: 1px solid rgba(248,81,73,.35);
+  color: var(--expense);
+  font-size: 13px;
+  padding: 7px 14px;
+}
+.bt-delete-month-btn:hover {
+  background: var(--expense-bg);
+  border-color: var(--expense);
+}
+
 /* ── Fixed/Variable type toggle (category-page) ── */
 .budget-type-toggle {
   display: flex;
