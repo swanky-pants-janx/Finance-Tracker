@@ -107,23 +107,25 @@
     }
 
     /* ─── Plan actions ─── */
-    function openPlan(planId) {
+    async function openPlan(planId) {
       const data = State.getData();
       data.activePlanId = planId;
       State.saveData(data);
+      await State.flush();
       window.location.href = 'finance-app.html';
     }
 
-    function addPlan() {
+    async function addPlan() {
       const data = State.getData();
       const plan = State.newPlan('Plan ' + (data.plans.length + 1));
       data.plans.push(plan);
       data.activePlanId = plan.id;
       State.saveData(data);
+      await State.flush();
       render();
     }
 
-    function duplicatePlan(planId) {
+    async function duplicatePlan(planId) {
       const data = State.getData();
       const src = data.plans.find(p => p.id === planId);
       if (!src) return;
@@ -144,15 +146,17 @@
       });
       data.plans.splice(data.plans.findIndex(p => p.id === planId) + 1, 0, copy);
       State.saveData(data);
+      await State.flush();
       render();
     }
 
-    function deletePlan(planId) {
+    async function deletePlan(planId) {
       const data = State.getData();
       if (data.plans.length <= 1) return;
       data.plans = data.plans.filter(p => p.id !== planId);
       if (data.activePlanId === planId) data.activePlanId = data.plans[0].id;
       State.saveData(data);
+      await State.flush();
       render();
     }
 
@@ -173,13 +177,14 @@
       renamePlanId = null;
     }
 
-    function commitRename() {
+    async function commitRename() {
       const name = document.getElementById('renameInput').value.trim();
       if (!name || !renamePlanId) return;
       const data = State.getData();
       const plan = data.plans.find(p => p.id === renamePlanId);
       if (plan) plan.name = name;
       State.saveData(data);
+      await State.flush();
       closeRenameModal();
       render();
     }
