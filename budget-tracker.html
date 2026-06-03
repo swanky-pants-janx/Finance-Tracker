@@ -187,7 +187,7 @@
       return div;
     }
 
-    /* ─── Danger zone (delete month) ─── */
+    /* ─── Danger zone (delete / sync month) ─── */
     function renderDangerZone(budget) {
       const div = document.createElement('div');
       div.className = 'bt-danger-zone';
@@ -195,6 +195,16 @@
       const planNote = document.createElement('div');
       planNote.className = 'bt-active-plan-note';
       planNote.textContent = budget.planName ? `Based on: ${budget.planName}` : '';
+
+      const syncBtn = document.createElement('button');
+      syncBtn.className = 'btn bt-sync-btn';
+      syncBtn.textContent = '↻ Sync allocations from plan';
+      syncBtn.addEventListener('click', () => {
+        if (!confirm(`Sync "${budget.planName || 'your plan'}" changes into this month?\n\nThis will update names and allocated amounts, and add any new categories or items. Your existing transactions and paid statuses won't be affected.`)) return;
+        State.syncBudgetFromPlan(budget);
+        State.saveBudget(budget);
+        renderPage();
+      });
 
       const delBtn = document.createElement('button');
       delBtn.className = 'btn bt-delete-month-btn';
@@ -205,7 +215,7 @@
         window.location.href = 'budget-hub.html';
       });
 
-      div.append(planNote, delBtn);
+      div.append(planNote, syncBtn, delBtn);
       return div;
     }
 

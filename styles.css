@@ -1867,6 +1867,17 @@ input::placeholder { color: var(--muted); }
   gap: 12px;
   flex-wrap: wrap;
 }
+.bt-sync-btn {
+  background: transparent;
+  border: 1px solid rgba(124,106,245,.4);
+  color: var(--accent);
+  font-size: 13px;
+  padding: 7px 14px;
+}
+.bt-sync-btn:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+}
 .bt-active-plan-note {
   font-size: 13px;
   color: var(--muted);

@@ -226,6 +226,53 @@ const State = {
     };
   },
 
+  // Sync an existing budget month from its source plan:
+  // - Updates netIncome, category names, item names, allocatedAmounts
+  // - Adds new categories/items that appeared in the plan since the budget was created
+  // - Never removes existing categories/items (preserves transaction history)
+  syncBudgetFromPlan: (budget) => {
+    const data = State.getData();
+    const plan = (budget.planId && data.plans.find(p => p.id === budget.planId)) || State.getActivePlan();
+
+    const grossIncome = plan.income.categories
+      .filter(c => !c.disabled)
+      .reduce((s, c) => s + c.items.filter(i => !i.disabled && !i.pctMode)
+        .reduce((ss, i) => ss + (parseFloat(i.amount) || 0), 0), 0);
+    budget.netIncome = Math.round((grossIncome - calcSATax(grossIncome)) * 100) / 100;
+    budget.planName = plan.name;
+
+    for (const planCat of plan.expenses.categories.filter(c => !c.disabled)) {
+      let budgetCat = budget.categories.find(c => c.planCatId === planCat.id);
+      if (!budgetCat) {
+        budgetCat = { id: State.genId(), planCatId: planCat.id, name: planCat.name, items: [] };
+        budget.categories.push(budgetCat);
+      } else {
+        budgetCat.name = planCat.name;
+      }
+
+      for (const planItem of planCat.items.filter(i => !i.disabled)) {
+        const budgetItem = budgetCat.items.find(i => i.planItemId === planItem.id);
+        if (!budgetItem) {
+          budgetCat.items.push({
+            id: State.genId(),
+            planItemId: planItem.id,
+            name: planItem.name,
+            allocatedAmount: State.resolveItemAmt(planItem, plan),
+            type: planItem.budgetType || 'variable',
+            paid: false,
+            transactions: []
+          });
+        } else {
+          budgetItem.name = planItem.name;
+          budgetItem.allocatedAmount = State.resolveItemAmt(planItem, plan);
+          budgetItem.type = planItem.budgetType || budgetItem.type || 'variable';
+        }
+      }
+    }
+
+    return budget;
+  },
+
   flush: async () => {
     clearTimeout(State._syncTimer);
     await State._flushToDb();
