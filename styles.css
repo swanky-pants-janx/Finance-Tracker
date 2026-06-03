@@ -1074,6 +1074,14 @@ input::placeholder { color: var(--muted); }
   /* ── Prevent iOS auto-zoom on focus ── */
   input { font-size: 16px; }
 
+  /* ── Budget tracker ── */
+  .page-budget { height: auto; min-height: 100vh; overflow-y: auto; }
+  .budget-wrap { overflow-y: visible; padding: 10px; gap: 10px; }
+  .bt-summary-strip { padding: 10px 12px; gap: 8px; }
+  .bt-stat-label { font-size: 9px; }
+  .bt-stat-val { font-size: 13px; letter-spacing: -.2px; }
+  .bt-summary-divider { display: none; }
+
   /* ── Login ── */
   .login-wrap { padding: 16px; gap: 20px; }
   .login-card { padding: 22px 18px; }
