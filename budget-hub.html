@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Budget Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-hub">
+
+  <nav class="top-nav">
+    <button class="nav-back" onclick="window.location.href='landing-page.html'">← Back</button>
+    <span class="nav-title">Budget Tracker</span>
+    <div class="nav-actions">
+      <button class="btn btn-ghost btn-sm" onclick="State.signOut()">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="hub-wrap" id="hubWrap"></div>
+
+  <!-- New Month modal -->
+  <div class="modal-backdrop hidden" id="newMonthBackdrop"></div>
+  <div class="modal hidden" id="newMonthModal">
+    <div class="modal-header">
+      <span class="modal-title">Start New Budget Month</span>
+      <button class="modal-close" id="newMonthClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Month</label>
+        <input type="month" id="newMonthInput">
+      </div>
+      <div class="modal-field" id="planPickerField">
+        <label>Finance Plan</label>
+        <select id="newMonthPlan" class="bt-plan-select"></select>
+      </div>
+      <button class="btn btn-primary btn-full" id="newMonthSave">Start Budget</button>
+    </div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const fmt = State.fmt;
+
+    function monthLabel(key) {
+      const [y, m] = key.split('-');
+      return new Date(+y, +m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    }
+
+    function currentMonthKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function budgetSummary(budget) {
+      let totalAllocated = 0, totalSpent = 0;
+      for (const cat of budget.categories) {
+        for (const item of cat.items) {
+          totalAllocated += item.allocatedAmount;
+          if (item.type === 'fixed') {
+            totalSpent += item.paid ? item.allocatedAmount : 0;
+          } else {
+            totalSpent += item.transactions.reduce((s, t) => s + t.amount, 0);
+          }
+        }
+      }
+      return { totalAllocated, totalSpent, surplus: budget.netIncome - totalSpent };
+    }
+
+    /* ─── Render ─── */
+    function render() {
+      const wrap = document.getElementById('hubWrap');
+      wrap.innerHTML = '';
+
+      const budgets = State.getBudgets().slice().sort((a, b) => b.month.localeCompare(a.month));
+      const grid = document.createElement('div');
+      grid.className = 'hub-grid';
+
+      budgets.forEach(b => grid.appendChild(makeBudgetCard(b)));
+      grid.appendChild(makeNewCard());
+
+      wrap.appendChild(grid);
+    }
+
+    function makeBudgetCard(budget) {
+      const { totalAllocated, totalSpent, surplus } = budgetSummary(budget);
+      const pct = totalAllocated > 0 ? Math.min((totalSpent / totalAllocated) * 100, 100) : 0;
+      const over = surplus < 0;
+      const thisMonth = currentMonthKey();
+      const isCurrent = budget.month === thisMonth;
+
+      const card = document.createElement('div');
+      card.className = 'hub-card budget-card';
+
+      card.innerHTML = `
+        <div class="hub-card-header">
+          <div>
+            <span class="hub-card-title">${monthLabel(budget.month)}</span>
+            ${isCurrent ? '<span class="hub-current-badge">Current</span>' : ''}
+          </div>
+          <div class="hub-card-actions">
+            <button class="hca-btn danger" data-action="delete" title="Delete month">×</button>
+          </div>
+        </div>
+        ${budget.planName ? `<div class="hub-card-plan-note">${budget.planName}</div>` : ''}
+        <div class="hub-card-stats">
+          <div class="hub-stat">
+            <span class="hub-stat-label">Allocated</span>
+            <span class="hub-stat-val">${fmt(totalAllocated)}</span>
+          </div>
+          <div class="hub-stat">
+            <span class="hub-stat-label">Spent</span>
+            <span class="hub-stat-val expense">${fmt(totalSpent)}</span>
+          </div>
+          <div class="hub-stat">
+            <span class="hub-stat-label">Surplus</span>
+            <span class="hub-stat-val ${over ? 'expense' : 'income'}">${over ? '−' : ''}${fmt(Math.abs(surplus))}</span>
+          </div>
+        </div>
+        <div class="hub-progress-wrap">
+          <div class="hub-progress-track">
+            <div class="hub-progress-fill ${over ? 'over' : ''}" style="width:${pct}%"></div>
+          </div>
+          <span class="hub-progress-pct">${pct.toFixed(0)}%</span>
+        </div>
+        <button class="btn btn-primary hub-open-btn">Open →</button>
+      `;
+
+      card.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm(`Delete budget for ${monthLabel(budget.month)}? All transactions will be lost.`)) return;
+        State.deleteBudget(budget.id);
+        render();
+      });
+
+      card.querySelector('.hub-open-btn').addEventListener('click', () => {
+        window.location.href = `budget-tracker.html?month=${budget.month}`;
+      });
+
+      return card;
+    }
+
+    function makeNewCard() {
+      const card = document.createElement('div');
+      card.className = 'hub-card hub-new-card';
+      card.innerHTML = `
+        <div class="hub-new-icon">+</div>
+        <span class="hub-new-label">New Month Budget</span>
+      `;
+      card.addEventListener('click', openNewMonthModal);
+      return card;
+    }
+
+    /* ─── New month modal ─── */
+    function openNewMonthModal() {
+      // Default to next unstarted month
+      const existingMonths = new Set(State.getBudgets().map(b => b.month));
+      let d = new Date();
+      // Start from current month, find first unstarted
+      for (let i = 0; i < 24; i++) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!existingMonths.has(key)) {
+          document.getElementById('newMonthInput').value = key;
+          break;
+        }
+        d.setMonth(d.getMonth() + 1);
+      }
+
+      // Populate plan picker
+      const planSel = document.getElementById('newMonthPlan');
+      planSel.innerHTML = '';
+      const plans = State.getData().plans || [];
+      const activePlanId = State.getData().activePlanId;
+      plans.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        if (p.id === activePlanId) opt.selected = true;
+        planSel.appendChild(opt);
+      });
+
+      // Hide plan picker if only one plan
+      document.getElementById('planPickerField').classList.toggle('hidden', plans.length <= 1);
+
+      document.getElementById('newMonthBackdrop').classList.remove('hidden');
+      document.getElementById('newMonthModal').classList.remove('hidden');
+    }
+
+    function closeNewMonthModal() {
+      document.getElementById('newMonthBackdrop').classList.add('hidden');
+      document.getElementById('newMonthModal').classList.add('hidden');
+    }
+
+    document.getElementById('newMonthClose').addEventListener('click', closeNewMonthModal);
+    document.getElementById('newMonthBackdrop').addEventListener('click', closeNewMonthModal);
+
+    document.getElementById('newMonthSave').addEventListener('click', () => {
+      const monthKey = document.getElementById('newMonthInput').value;
+      if (!monthKey) return;
+      if (State.getBudget(monthKey)) {
+        if (!confirm(`A budget for ${monthLabel(monthKey)} already exists. Open it instead?`)) return;
+        closeNewMonthModal();
+        window.location.href = `budget-tracker.html?month=${monthKey}`;
+        return;
+      }
+      const planId = document.getElementById('newMonthPlan').value || State.getData().plans[0]?.id;
+      const budget = State.clonePlanToBudget(monthKey, planId);
+      State.saveBudget(budget);
+      closeNewMonthModal();
+      window.location.href = `budget-tracker.html?month=${monthKey}`;
+    });
+
+    /* ─── Init ─── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      render();
+    });
+  </script>
+</body>
+</html>

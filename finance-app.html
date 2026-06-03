@@ -10,16 +10,13 @@
 
   <!-- ── Top nav ── -->
   <nav class="top-nav">
-    <button class="nav-back" onclick="window.location.href='landing-page.html'">← Back</button>
+    <button class="nav-back" onclick="window.location.href='finance-plans.html'">← Back</button>
     <span class="nav-title">Finance Planner</span>
     <div class="nav-actions">
       <button class="btn btn-ghost view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">⊞ Table View</button>
       <button class="btn btn-ghost" onclick="State.signOut()">Sign Out</button>
     </div>
   </nav>
-
-  <!-- ── Plan tabs (rendered by JS) ── -->
-  <div class="tab-bar" id="tabBar"></div>
 
   <!-- ── Board ── -->
   <div class="finance-board">
@@ -123,8 +120,6 @@
     function render() {
       const { data, plan } = getPlan();
 
-      renderTabBar(data);
-
       // Income: skip disabled categories
       const incGross = plan.income.categories
         .filter(c => !c.disabled)
@@ -151,129 +146,6 @@
 
       // Summary chart (only active expense categories)
       renderSummaryChart(plan.expenses.categories.filter(c => !c.disabled), incAfterTax);
-    }
-
-    /* ── Tab bar ── */
-    function renderTabBar(data) {
-      const bar = document.getElementById('tabBar');
-      bar.innerHTML = '';
-
-      data.plans.forEach(plan => {
-        const isActive = plan.id === data.activePlanId;
-        const chip = document.createElement('div');
-        chip.className = 'tab-chip' + (isActive ? ' active' : '');
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'tab-name';
-        nameSpan.textContent = plan.name;
-        chip.appendChild(nameSpan);
-
-        const dup = document.createElement('button');
-        dup.className = 'tab-dup';
-        dup.title = 'Duplicate plan';
-        dup.textContent = '⧉';
-        dup.addEventListener('click', (e) => { e.stopPropagation(); duplicatePlan(plan.id); });
-        chip.appendChild(dup);
-
-        if (data.plans.length > 1) {
-          const del = document.createElement('button');
-          del.className = 'tab-del';
-          del.title = 'Delete plan';
-          del.textContent = '×';
-          del.addEventListener('click', (e) => { e.stopPropagation(); deletePlan(plan.id); });
-          chip.appendChild(del);
-        }
-
-        chip.addEventListener('click', () => switchPlan(plan.id));
-        nameSpan.addEventListener('dblclick', (e) => { e.stopPropagation(); startRename(plan.id, nameSpan); });
-        bar.appendChild(chip);
-      });
-
-      const addBtn = document.createElement('button');
-      addBtn.className = 'tab-add';
-      addBtn.textContent = '+ New Plan';
-      addBtn.addEventListener('click', addPlan);
-      bar.appendChild(addBtn);
-    }
-
-    function switchPlan(planId) {
-      const data = State.getData();
-      if (data.activePlanId === planId) return;
-      data.activePlanId = planId;
-      savePlan(data);
-      render();
-    }
-
-    function addPlan() {
-      const data = State.getData();
-      const plan = State.newPlan('Plan ' + (data.plans.length + 1));
-      data.plans.push(plan);
-      data.activePlanId = plan.id;
-      savePlan(data);
-      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
-      render();
-    }
-
-    function duplicatePlan(planId) {
-      const data = State.getData();
-      const src  = data.plans.find(p => p.id === planId);
-      if (!src) return;
-      const copy = JSON.parse(JSON.stringify(src));
-      copy.id   = 'plan_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
-      copy.name = src.name + ' (copy)';
-      // Give all categories and items fresh IDs so references stay consistent within the copy
-      [...copy.income.categories, ...copy.expenses.categories].forEach(cat => {
-        const oldCatId = cat.id;
-        cat.id = State.genId();
-        cat.items.forEach(item => {
-          const oldItemId = item.id;
-          item.id = State.genId();
-          // Fix up intra-plan pct references to point to the new IDs
-          if (item.pctMode) {
-            if (item.refType === 'cat'  && item.refId === oldCatId)  item.refId = cat.id;
-            if (item.refType === 'item' && item.refId === oldItemId) item.refId = item.id;
-          }
-        });
-      });
-      data.plans.splice(data.plans.findIndex(p => p.id === planId) + 1, 0, copy);
-      data.activePlanId = copy.id;
-      savePlan(data);
-      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
-      render();
-    }
-
-    function deletePlan(planId) {
-      const data = State.getData();
-      if (data.plans.length <= 1) return;
-      data.plans = data.plans.filter(p => p.id !== planId);
-      if (data.activePlanId === planId) data.activePlanId = data.plans[0].id;
-      savePlan(data);
-      if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
-      render();
-    }
-
-    function startRename(planId, nameSpan) {
-      const current = nameSpan.textContent;
-      const input = document.createElement('input');
-      input.className = 'tab-rename-input';
-      input.value = current;
-      nameSpan.replaceWith(input);
-      input.focus();
-      input.select();
-
-      const commit = () => {
-        const newName = input.value.trim() || current;
-        const data = State.getData();
-        const plan = data.plans.find(p => p.id === planId);
-        if (plan) plan.name = newName;
-        savePlan(data);
-        render();
-      };
-      input.addEventListener('blur', commit);
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') input.blur();
-        if (e.key === 'Escape') { input.value = current; input.blur(); }
-      });
     }
 
     /* ── Category cards + inline add ── */

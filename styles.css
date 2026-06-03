@@ -1321,6 +1321,250 @@ input::placeholder { color: var(--muted); }
 }
 
 /* ════════════════════════════════════════════
+   HUB PAGES (finance-plans, budget-hub)
+════════════════════════════════════════════ */
+.page-hub { display: flex; flex-direction: column; min-height: 100vh; }
+
+.hub-wrap {
+  flex: 1;
+  padding: 20px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+/* ── Base card ── */
+.hub-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+.hub-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(124,106,245,.15);
+}
+
+.hub-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hub-card-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+  flex: 1;
+}
+.hub-card-plan-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -8px;
+}
+.hub-current-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Action buttons (rename, dupe, delete) */
+.hub-card-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.hca-btn {
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .15s;
+  padding: 0;
+  font-family: inherit;
+}
+.hca-btn:hover { background: var(--surface-2); color: var(--text); }
+.hca-btn.danger { color: var(--expense); border-color: rgba(248,81,73,.3); }
+.hca-btn.danger:hover { background: var(--expense-bg); border-color: var(--expense); }
+
+/* Stat grid inside card */
+.hub-card-stats {
+  display: flex;
+  gap: 10px;
+}
+.hub-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--surface-2);
+  border-radius: var(--r);
+  padding: 8px 10px;
+}
+.hub-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+}
+.hub-stat-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.3px;
+}
+.hub-stat-val.income { color: var(--income); }
+.hub-stat-val.expense { color: var(--expense); }
+
+.hub-card-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -6px;
+}
+
+.hub-open-btn {
+  margin-top: auto;
+  font-size: 14px;
+  padding: 10px 16px;
+}
+
+/* ── Budget progress bar ── */
+.hub-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hub-progress-track {
+  flex: 1;
+  height: 5px;
+  background: var(--surface-3);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.hub-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width .3s ease;
+  min-width: 0;
+}
+.hub-progress-fill.over { background: var(--expense); }
+.hub-progress-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 32px;
+  text-align: right;
+}
+
+/* ── New card ── */
+.hub-new-card {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  cursor: pointer;
+  min-height: 180px;
+  color: var(--muted);
+  gap: 10px;
+}
+.hub-new-card:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-glow); }
+.hub-new-icon {
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1;
+}
+.hub-new-label { font-size: 14px; font-weight: 500; }
+
+/* ── Modal (plan rename, new month) ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 200;
+}
+.modal {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  width: min(420px, calc(100vw - 32px));
+  z-index: 201;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  animation: modalIn .18s ease;
+}
+@keyframes modalIn { from { opacity: 0; transform: translate(-50%, -46%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 16px; font-weight: 600; }
+.modal-close {
+  background: none; border: none;
+  color: var(--muted); font-size: 18px;
+  cursor: pointer; padding: 4px 8px;
+  border-radius: 6px; font-family: inherit;
+  transition: all .15s;
+}
+.modal-close:hover { background: var(--surface-2); color: var(--text); }
+
+.modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-field label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  .hub-wrap { padding: 12px; }
+  .hub-grid { grid-template-columns: 1fr; }
+  .hub-new-card { min-height: 100px; flex-direction: row; justify-content: flex-start; padding: 16px 18px; }
+}
+
+/* ════════════════════════════════════════════
    BUDGET TRACKER
 ════════════════════════════════════════════ */
 .page-budget { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }

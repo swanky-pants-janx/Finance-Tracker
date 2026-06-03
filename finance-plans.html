@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Finance Plans</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-hub">
+
+  <nav class="top-nav">
+    <button class="nav-back" onclick="window.location.href='landing-page.html'">← Back</button>
+    <span class="nav-title">Finance Plans</span>
+    <div class="nav-actions">
+      <button class="btn btn-ghost btn-sm" onclick="State.signOut()">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="hub-wrap" id="hubWrap"></div>
+
+  <!-- Rename modal -->
+  <div class="modal-backdrop hidden" id="renameBackdrop"></div>
+  <div class="modal hidden" id="renameModal">
+    <div class="modal-header">
+      <span class="modal-title">Rename Plan</span>
+      <button class="modal-close" id="renameClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Plan name</label>
+        <input type="text" id="renameInput" placeholder="My Plan">
+      </div>
+      <button class="btn btn-primary btn-full" id="renameSave">Save</button>
+    </div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const fmt = State.fmt;
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    /* ─── Plan stats ─── */
+    function planStats(plan) {
+      const allCats = [...plan.income.categories, ...plan.expenses.categories];
+      const grossIncome = plan.income.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + c.items.filter(i => !i.disabled && !i.pctMode)
+          .reduce((ss, i) => ss + (parseFloat(i.amount) || 0), 0), 0);
+      const netIncome = grossIncome - calcSATax(grossIncome);
+      const totalExp = plan.expenses.categories
+        .filter(c => !c.disabled)
+        .reduce((s, c) => s + c.items.filter(i => !i.disabled)
+          .reduce((ss, i) => ss + State.resolveItemAmt(i, plan), 0), 0);
+      const remaining = netIncome - totalExp;
+      const catCount = plan.expenses.categories.filter(c => !c.disabled).length;
+      return { netIncome, totalExp, remaining, catCount };
+    }
+
+    /* ─── Render ─── */
+    function render() {
+      const data = State.getData();
+      const wrap = document.getElementById('hubWrap');
+      wrap.innerHTML = '';
+
+      const grid = document.createElement('div');
+      grid.className = 'hub-grid';
+
+      data.plans.forEach(plan => {
+        grid.appendChild(makePlanCard(plan, data));
+      });
+
+      grid.appendChild(makeNewCard());
+      wrap.appendChild(grid);
+    }
+
+    function makePlanCard(plan, data) {
+      const { netIncome, totalExp, remaining, catCount } = planStats(plan);
+      const over = remaining < 0;
+      const isActive = plan.id === data.activePlanId;
+
+      const card = document.createElement('div');
+      card.className = 'hub-card plan-card';
+
+      card.innerHTML = `
+        <div class="hub-card-header">
+          <span class="hub-card-title">${esc(plan.name)}</span>
+          <div class="hub-card-actions">
+            <button class="hca-btn" data-action="rename" title="Rename">✎</button>
+            <button class="hca-btn" data-action="duplicate" title="Duplicate">⧉</button>
+            ${data.plans.length > 1 ? `<button class="hca-btn danger" data-action="delete" title="Delete">×</button>` : ''}
+          </div>
+        </div>
+        <div class="hub-card-stats">
+          <div class="hub-stat">
+            <span class="hub-stat-label">Net Income</span>
+            <span class="hub-stat-val income">${fmt(netIncome)}</span>
+          </div>
+          <div class="hub-stat">
+            <span class="hub-stat-label">Expenses</span>
+            <span class="hub-stat-val expense">${fmt(totalExp)}</span>
+          </div>
+          <div class="hub-stat">
+            <span class="hub-stat-label">Remaining</span>
+            <span class="hub-stat-val ${over ? 'expense' : 'income'}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
+          </div>
+        </div>
+        <div class="hub-card-meta">${catCount} expense categor${catCount === 1 ? 'y' : 'ies'}</div>
+        <button class="btn btn-primary hub-open-btn">Open Plan →</button>
+      `;
+
+      card.querySelector('[data-action="rename"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openRenameModal(plan.id, plan.name);
+      });
+
+      card.querySelector('[data-action="duplicate"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        duplicatePlan(plan.id);
+      });
+
+      const delBtn = card.querySelector('[data-action="delete"]');
+      if (delBtn) {
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!confirm(`Delete "${plan.name}"? This cannot be undone.`)) return;
+          deletePlan(plan.id);
+        });
+      }
+
+      card.querySelector('.hub-open-btn').addEventListener('click', () => openPlan(plan.id));
+
+      return card;
+    }
+
+    function makeNewCard() {
+      const card = document.createElement('div');
+      card.className = 'hub-card hub-new-card';
+      card.innerHTML = `
+        <div class="hub-new-icon">+</div>
+        <span class="hub-new-label">New Finance Plan</span>
+      `;
+      card.addEventListener('click', addPlan);
+      return card;
+    }
+
+    /* ─── Plan actions ─── */
+    function openPlan(planId) {
+      const data = State.getData();
+      data.activePlanId = planId;
+      State.saveData(data);
+      window.location.href = 'finance-app.html';
+    }
+
+    function addPlan() {
+      const data = State.getData();
+      const plan = State.newPlan('Plan ' + (data.plans.length + 1));
+      data.plans.push(plan);
+      data.activePlanId = plan.id;
+      State.saveData(data);
+      render();
+    }
+
+    function duplicatePlan(planId) {
+      const data = State.getData();
+      const src = data.plans.find(p => p.id === planId);
+      if (!src) return;
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id   = State.genId();
+      copy.name = src.name + ' (copy)';
+      [...copy.income.categories, ...copy.expenses.categories].forEach(cat => {
+        const oldCatId = cat.id;
+        cat.id = State.genId();
+        cat.items.forEach(item => {
+          const oldItemId = item.id;
+          item.id = State.genId();
+          if (item.pctMode) {
+            if (item.refType === 'cat'  && item.refId === oldCatId)  item.refId = cat.id;
+            if (item.refType === 'item' && item.refId === oldItemId) item.refId = item.id;
+          }
+        });
+      });
+      data.plans.splice(data.plans.findIndex(p => p.id === planId) + 1, 0, copy);
+      State.saveData(data);
+      render();
+    }
+
+    function deletePlan(planId) {
+      const data = State.getData();
+      if (data.plans.length <= 1) return;
+      data.plans = data.plans.filter(p => p.id !== planId);
+      if (data.activePlanId === planId) data.activePlanId = data.plans[0].id;
+      State.saveData(data);
+      render();
+    }
+
+    /* ─── Rename modal ─── */
+    let renamePlanId = null;
+
+    function openRenameModal(planId, currentName) {
+      renamePlanId = planId;
+      document.getElementById('renameInput').value = currentName;
+      document.getElementById('renameBackdrop').classList.remove('hidden');
+      document.getElementById('renameModal').classList.remove('hidden');
+      setTimeout(() => { document.getElementById('renameInput').focus(); document.getElementById('renameInput').select(); }, 50);
+    }
+
+    function closeRenameModal() {
+      document.getElementById('renameBackdrop').classList.add('hidden');
+      document.getElementById('renameModal').classList.add('hidden');
+      renamePlanId = null;
+    }
+
+    function commitRename() {
+      const name = document.getElementById('renameInput').value.trim();
+      if (!name || !renamePlanId) return;
+      const data = State.getData();
+      const plan = data.plans.find(p => p.id === renamePlanId);
+      if (plan) plan.name = name;
+      State.saveData(data);
+      closeRenameModal();
+      render();
+    }
+
+    document.getElementById('renameClose').addEventListener('click', closeRenameModal);
+    document.getElementById('renameBackdrop').addEventListener('click', closeRenameModal);
+    document.getElementById('renameSave').addEventListener('click', commitRename);
+    document.getElementById('renameInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') commitRename();
+      if (e.key === 'Escape') closeRenameModal();
+    });
+
+    /* ─── Init ─── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      render();
+    });
+  </script>
+</body>
+</html>

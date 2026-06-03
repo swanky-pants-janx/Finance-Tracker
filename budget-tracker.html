@@ -9,11 +9,8 @@
 <body class="page-budget">
 
   <nav class="top-nav">
-    <button class="nav-back" onclick="window.location.href='landing-page.html'">← Back</button>
+    <button class="nav-back" onclick="window.location.href='budget-hub.html'">← Back</button>
     <span class="nav-title" id="navTitle">Budget Tracker</span>
-    <div class="nav-actions">
-      <select class="month-picker" id="monthPicker"></select>
-    </div>
   </nav>
 
   <div class="budget-wrap" id="budgetWrap">
@@ -65,9 +62,8 @@
       return new Date(+y, +m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
     }
 
-    function currentMonthKey() {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    function monthKeyFromUrl() {
+      return new URLSearchParams(window.location.search).get('month') || '';
     }
 
     /* ─── Summary numbers ─── */
@@ -110,57 +106,23 @@
       `;
     }
 
-    /* ─── Render month picker ─── */
-    function renderMonthPicker() {
-      const picker = document.getElementById('monthPicker');
-      const selectedVal = picker.value || (currentBudget ? currentBudget.month : currentMonthKey());
-      picker.innerHTML = '';
-      const budgets = State.getBudgets();
-      const thisMonth = currentMonthKey();
-
-      const months = new Set(budgets.map(b => b.month));
-      // Always include current month + next 2 so user can always start a new month
-      for (let i = 0; i < 3; i++) {
-        const d = new Date();
-        d.setMonth(d.getMonth() + i);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        months.add(key);
-      }
-
-      const sorted = [...months].sort((a, b) => b.localeCompare(a));
-      sorted.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        const hasBudget = State.getBudget(m);
-        opt.textContent = monthLabel(m) + (hasBudget ? '' : ' — not started');
-        if (m === selectedVal) opt.selected = true;
-        picker.appendChild(opt);
-      });
-
-      picker.onchange = () => {
-        const selected = picker.value;
-        currentBudget = State.getBudget(selected);
-        renderPage();
-      };
-    }
-
     /* ─── Main render ─── */
     function renderPage() {
-      renderMonthPicker();
       const wrap = document.getElementById('budgetWrap');
       wrap.innerHTML = '';
 
-      const thisMonth = currentMonthKey();
-      const pickedMonth = document.getElementById('monthPicker').value || thisMonth;
-      currentBudget = State.getBudget(pickedMonth);
+      const monthKey = monthKeyFromUrl();
+      if (!monthKey) { window.location.href = 'budget-hub.html'; return; }
+
+      currentBudget = State.getBudget(monthKey);
+      document.getElementById('navTitle').textContent = monthLabel(monthKey);
+      document.title = `FinTrack — ${monthLabel(monthKey)}`;
 
       if (!currentBudget) {
-        // Show "start month" prompt
-        wrap.appendChild(renderStartPrompt(pickedMonth));
+        wrap.appendChild(renderStartPrompt(monthKey));
         return;
       }
 
-      document.getElementById('navTitle').textContent = monthLabel(currentBudget.month);
       wrap.appendChild(renderSummaryStrip(currentBudget));
       wrap.appendChild(renderCategories(currentBudget));
       wrap.appendChild(renderDangerZone(currentBudget));
@@ -218,6 +180,7 @@
         const budget = State.clonePlanToBudget(monthKey, planId);
         State.saveBudget(budget);
         currentBudget = budget;
+        // Flush save before re-render so data is in cache
         renderPage();
       });
 
@@ -239,8 +202,7 @@
       delBtn.addEventListener('click', () => {
         if (!confirm(`Delete the budget for ${monthLabel(budget.month)}? This will erase all transactions and cannot be undone.`)) return;
         State.deleteBudget(budget.id);
-        currentBudget = null;
-        renderPage();
+        window.location.href = 'budget-hub.html';
       });
 
       div.append(planNote, delBtn);
@@ -538,7 +500,6 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
-      currentBudget = State.getBudget(currentMonthKey());
       renderPage();
     });
   </script>
