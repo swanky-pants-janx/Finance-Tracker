@@ -10,7 +10,7 @@
 
   <!-- ── Top nav ── -->
   <nav class="top-nav">
-    <button class="nav-back" onclick="window.location.href='finance-plans.html'">← Back</button>
+    <button class="nav-back" onclick="State.flush().then(()=>window.location.href='finance-plans.html')">← Back</button>
     <span class="nav-title">Finance Planner</span>
     <div class="nav-actions">
       <button class="btn btn-ghost view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">⊞ Table View</button>
@@ -229,7 +229,7 @@
       // Navigate (not on action buttons)
       el.addEventListener('click', (e) => {
         if (e.target.closest('.card-del') || e.target.closest('.card-toggle') || e.target.classList.contains('drag-handle')) return;
-        window.location.href = `category-page.html?type=${kind}&id=${cat.id}`;
+        navToCategory(kind, cat.id);
       });
 
       // Toggle disable
@@ -329,7 +329,7 @@
         values       = [...active.map(c => catTotal(c)), remaining > 0 ? remaining : 0];
         bgColors     = [...COLORS.slice(0, active.length), REMAINING_COLOR];
         clickHandlers = active.map(cat => () => {
-          window.location.href = `category-page.html?type=expense&id=${cat.id}`;
+          navToCategory('expense', cat.id);
         });
       } else {
         // Flatten all active items across all active expense categories
@@ -346,7 +346,7 @@
         // Shade items by their parent category color for visual grouping
         bgColors     = [...allItems.map(i => COLORS[i.catIndex % COLORS.length] + 'cc'), REMAINING_COLOR];
         clickHandlers = allItems.map(item => () => {
-          window.location.href = `category-page.html?type=expense&id=${item.catId}`;
+          navToCategory('expense', item.catId);
         });
       }
 
@@ -430,7 +430,7 @@
             <span class="leg-pct">${pct}%</span>
           `;
           el.addEventListener('click', () => {
-            window.location.href = `category-page.html?type=expense&id=${cat.id}`;
+            navToCategory('expense', cat.id);
           });
           legend.appendChild(el);
         });
@@ -465,7 +465,7 @@
               <span class="leg-pct">${pct}%</span>
             `;
             el.addEventListener('click', () => {
-              window.location.href = `category-page.html?type=expense&id=${cat.id}`;
+              navToCategory('expense', cat.id);
             });
             legend.appendChild(el);
           });
@@ -682,9 +682,17 @@
     /* ════════════════════════════════════════
        INIT
     ════════════════════════════════════════ */
+    async function navToCategory(type, id) {
+      await State.flush();
+      window.location.href = `category-page.html?type=${type}&id=${id}`;
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') State.flush();
+      });
       render();
       initChartModeBtn();
     });

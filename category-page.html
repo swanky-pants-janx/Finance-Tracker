@@ -747,9 +747,13 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') State.flush();
+      });
       renderPage();
       initResizer();
-      document.getElementById('navBack').addEventListener('click', () => {
+      document.getElementById('navBack').addEventListener('click', async () => {
+        await State.flush();
         window.location.href = 'finance-app.html';
       });
     });
