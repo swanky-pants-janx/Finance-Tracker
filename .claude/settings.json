@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --screenshot=/tmp/fintrack-login-desktop.png --window-size=1280,800 \"http://localhost:8743/index.html\")"
+    ]
+  }
+}
