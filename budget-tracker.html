@@ -59,35 +59,37 @@
       if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
 
       const { totalSpent, surplus } = budgetSummary(budget);
-      const cats = budget.categories.filter(c => catAllocated(c) > 0);
+      const remaining = Math.max(0, budget.netIncome - totalSpent);
+      const over = totalSpent > budget.netIncome;
 
       const chartBox   = document.getElementById('btChartBox');
       const chartEmpty = document.getElementById('btChartEmpty');
 
-      if (cats.length === 0) {
-        chartBox.classList.add('hidden');
-        chartEmpty.classList.remove('hidden');
-        document.getElementById('btChartLegend').innerHTML = '';
-        return;
-      }
       chartBox.classList.remove('hidden');
       chartEmpty.classList.add('hidden');
 
-      const values   = cats.map(c => catAllocated(c));
-      const remVal   = Math.max(0, budget.netIncome - cats.reduce((s, c) => s + catAllocated(c), 0));
-      const labels   = [...cats.map(c => c.name), 'Unallocated'];
-      const allVals  = [...values, remVal];
-      const bgColors = [...COLORS.slice(0, cats.length), REMAINING_COLOR];
+      const SPENT_COLOR     = '#f85149'; // red
+      const REMAINING_COLOR_CHART = over ? '#f85149' : '#3fb950'; // green when within budget
+      const SURPLUS_COLOR   = '#3d5a80'; // muted blue
 
-      const chartVals = allVals.every(v => v === 0) ? allVals.map((_, i) => i === allVals.length - 1 ? 1 : 0) : allVals;
+      // Two slices: spent + remaining budget
+      const spentPct     = budget.netIncome > 0 ? ((totalSpent / budget.netIncome) * 100).toFixed(1) : '0.0';
+      const remainingPct = budget.netIncome > 0 ? ((remaining / budget.netIncome) * 100).toFixed(1) : '100.0';
+
+      const chartVals  = [totalSpent, remaining];
+      const chartLabels = ['Spent', 'Remaining'];
+      const bgColors   = ['#f85149', over ? '#3d5a80' : '#3fb950'];
+
+      // If nothing spent yet, show a subtle placeholder
+      const displayVals = chartVals.every(v => v === 0) ? [0, 1] : chartVals;
 
       Chart.defaults.color = '#7d8a9e';
       summaryChart = new Chart(document.getElementById('btChart'), {
         type: 'doughnut',
         data: {
-          labels,
+          labels: chartLabels,
           datasets: [{
-            data: chartVals,
+            data: displayVals,
             backgroundColor: bgColors,
             borderColor: '#161b27',
             borderWidth: 2,
@@ -98,26 +100,14 @@
           responsive: true, maintainAspectRatio: true,
           cutout: '62%',
           layout: { padding: 16 },
-          onClick: (event, elements) => {
-            if (!elements.length) return;
-            const idx = elements[0].index;
-            if (idx < cats.length) {
-              window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cats[idx].id}`;
-            }
-          },
           plugins: {
             legend: { display: false },
             tooltip: {
               callbacks: {
                 label: (ctx) => {
-                  if (ctx.label === 'Unallocated') {
-                    const pct = budget.netIncome > 0 ? ((remVal / budget.netIncome) * 100).toFixed(1) : 0;
-                    return ` ${fmt(remVal)}  (${pct}% of income)`;
-                  }
-                  const cat   = cats[ctx.dataIndex];
-                  const spent = catSpent(cat);
-                  const alloc = catAllocated(cat);
-                  return ` Spent: ${fmt(spent)}  /  ${fmt(alloc)}`;
+                  const val = ctx.label === 'Spent' ? totalSpent : remaining;
+                  const pct = budget.netIncome > 0 ? ((val / budget.netIncome) * 100).toFixed(1) : 0;
+                  return ` ${fmt(val)}  (${pct}% of income)`;
                 }
               }
             }
@@ -125,38 +115,24 @@
         }
       });
 
-      // Legend
+      // Legend — two simple rows
       const legend = document.getElementById('btChartLegend');
       legend.innerHTML = '';
-      cats.forEach((cat, i) => {
-        const alloc = catAllocated(cat);
-        const pct   = budget.netIncome > 0 ? ((alloc / budget.netIncome) * 100).toFixed(1) : 0;
-        const el    = document.createElement('div');
-        el.className    = 'leg-item';
-        el.style.cursor = 'pointer';
-        el.title = 'Click to open category';
+
+      [
+        { label: 'Spent',     val: totalSpent, color: '#f85149', pct: spentPct },
+        { label: 'Remaining', val: remaining,  color: over ? '#3d5a80' : '#3fb950', pct: remainingPct }
+      ].forEach(row => {
+        const el = document.createElement('div');
+        el.className = 'leg-item';
         el.innerHTML = `
-          <div class="leg-dot" style="background:${COLORS[i % COLORS.length]}"></div>
-          <span class="leg-name">${esc(cat.name)}</span>
-          <span class="leg-pct">${pct}%</span>
+          <div class="leg-dot" style="background:${row.color}"></div>
+          <span class="leg-name">${row.label}</span>
+          <span class="leg-val" style="color:var(--muted);font-size:12px;margin-left:auto;margin-right:6px">${fmt(row.val)}</span>
+          <span class="leg-pct">${row.pct}%</span>
         `;
-        el.addEventListener('click', () => {
-          window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cat.id}`;
-        });
         legend.appendChild(el);
       });
-
-      if (remVal > 0) {
-        const remPct = budget.netIncome > 0 ? ((remVal / budget.netIncome) * 100).toFixed(1) : 0;
-        const remEl  = document.createElement('div');
-        remEl.className = 'leg-item';
-        remEl.innerHTML = `
-          <div class="leg-dot" style="background:${REMAINING_COLOR}"></div>
-          <span class="leg-name">Unallocated</span>
-          <span class="leg-pct">${remPct}%</span>
-        `;
-        legend.appendChild(remEl);
-      }
     }
 
     /* ─── Main render ─── */
@@ -184,16 +160,10 @@
       const board = document.createElement('div');
       board.className = 'bt-board';
 
-      // Left: categories list
+      // Left: categories list (no header, just cards)
       const catsCol = document.createElement('div');
       catsCol.className = 'bt-col bt-cats-col';
-      catsCol.innerHTML = `
-        <div class="col-header">
-          <div class="col-label expense-label">Categories</div>
-          <div class="col-total expense-total">${fmt(currentBudget.categories.reduce((s, c) => s + catAllocated(c), 0))}</div>
-        </div>
-        <div class="col-scroll" id="catsScroll"></div>
-      `;
+      catsCol.innerHTML = `<div class="col-scroll" id="catsScroll"></div>`;
 
       // Middle: summary stats
       const statsCol = document.createElement('div');
@@ -232,7 +202,8 @@
       chartCol.className = 'bt-col bt-chart-col';
       chartCol.innerHTML = `
         <div class="summary-top col-header">
-          <div class="col-label">Budget split</div>
+          <div class="col-label">Spending</div>
+          <div class="remaining-amt${budgetSummary(currentBudget).surplus < 0 ? ' neg' : ''}">${fmt(Math.abs(budgetSummary(currentBudget).surplus))} ${budgetSummary(currentBudget).surplus < 0 ? 'over' : 'left'}</div>
         </div>
         <div class="summary-bottom">
           <div id="btChartBox"><canvas id="btChart"></canvas></div>
@@ -279,38 +250,37 @@
       const remaining = alloc - spent;
       const over = remaining < 0;
       const pct = alloc > 0 ? Math.min((spent / alloc) * 100, 100) : 0;
+      const color = COLORS[colorIdx % COLORS.length];
+
+      const wrap = document.createElement('div');
+      wrap.className = 'bt-cat-card-wrap';
+      wrap.style.setProperty('--cat-color', color);
+      wrap.style.cursor = 'pointer';
 
       const card = document.createElement('div');
-      card.className = 'cat-card bt-cat-nav-card';
-      card.style.setProperty('--cat-color', COLORS[colorIdx % COLORS.length]);
-
+      card.className = 'bt-cat-nav-card';
       card.innerHTML = `
-        <span class="bt-cat-color-bar"></span>
         <span class="card-name">${esc(cat.name)}</span>
-        <span class="card-amt${over ? ' over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
+        <span class="card-amt${over ? ' over' : ''}">${over ? '−' : '+'}${fmt(Math.abs(remaining))}</span>
         <span class="bt-cat-nav-arrow">›</span>
       `;
 
-      // Progress bar under the card
       const barWrap = document.createElement('div');
       barWrap.className = 'bt-cat-nav-bar';
       barWrap.innerHTML = `
         <div class="bt-bar-track">
-          <div class="bt-bar-fill${over ? ' over' : ''}" style="width:${pct}%"></div>
+          <div class="bt-bar-fill${over ? ' over' : ''}" style="width:${pct}%; background:${over ? 'var(--expense)' : color}"></div>
         </div>
         <div class="bt-cat-nav-meta">
-          <span class="${over ? 'over' : 'expense'}">${fmt(spent)} spent</span>
-          <span style="color:var(--muted)"> / ${fmt(alloc)}</span>
+          <span class="${over ? 'over' : ''}" style="${over ? '' : 'color:var(--muted)'}">${fmt(spent)} spent</span>
+          <span>${fmt(alloc)} budget</span>
         </div>
       `;
 
-      card.addEventListener('click', () => {
+      wrap.append(card, barWrap);
+      wrap.addEventListener('click', () => {
         window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cat.id}`;
       });
-
-      const wrap = document.createElement('div');
-      wrap.className = 'bt-cat-card-wrap';
-      wrap.append(card, barWrap);
       return wrap;
     }
 
