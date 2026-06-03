@@ -110,7 +110,7 @@ const State = {
       if (raw.plans && !raw.finance) {
         State._cache = { finance: raw, savings: [] };
       } else {
-        State._cache = { finance: raw.finance || State._defaultData().finance, savings: raw.savings || [] };
+        State._cache = { finance: raw.finance || State._defaultData().finance, savings: raw.savings || [], budgets: raw.budgets || [] };
       }
       // Migrate legacy finance format without plans
       const f = State._cache.finance;
