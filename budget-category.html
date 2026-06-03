@@ -445,9 +445,17 @@
       const ok = await State.requireAuth();
       if (!ok) return;
       const { month } = getParams();
-      document.getElementById('navBack').addEventListener('click', () => {
+
+      document.getElementById('navBack').addEventListener('click', async () => {
+        await State.flush();
         window.location.href = `budget-tracker.html?month=${month}`;
       });
+
+      // Flush when tab/page becomes hidden (browser back gesture, tab switch, close)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') State.flush();
+      });
+
       renderPage();
       initResizer();
     });

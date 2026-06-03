@@ -9,7 +9,7 @@
 <body class="page-budget">
 
   <nav class="top-nav">
-    <button class="nav-back" onclick="window.location.href='budget-hub.html'">← Back</button>
+    <button class="nav-back" onclick="State.flush().then(()=>window.location.href='budget-hub.html')">← Back</button>
     <span class="nav-title" id="navTitle">Budget Tracker</span>
   </nav>
 
@@ -278,7 +278,8 @@
       `;
 
       wrap.append(card, barWrap);
-      wrap.addEventListener('click', () => {
+      wrap.addEventListener('click', async () => {
+        await State.flush();
         window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cat.id}`;
       });
       return wrap;
@@ -359,6 +360,9 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') State.flush();
+      });
       renderPage();
     });
   </script>
