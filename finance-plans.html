@@ -38,25 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="app.js"></script>
   <script>
-    const fmt = State.fmt;
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-    /* ─── Plan stats ─── */
-    function planStats(plan) {
-      const allCats = [...plan.income.categories, ...plan.expenses.categories];
-      const grossIncome = plan.income.categories
-        .filter(c => !c.disabled)
-        .reduce((s, c) => s + c.items.filter(i => !i.disabled && !i.pctMode)
-          .reduce((ss, i) => ss + (parseFloat(i.amount) || 0), 0), 0);
-      const netIncome = grossIncome - calcSATax(grossIncome);
-      const totalExp = plan.expenses.categories
-        .filter(c => !c.disabled)
-        .reduce((s, c) => s + c.items.filter(i => !i.disabled)
-          .reduce((ss, i) => ss + State.resolveItemAmt(i, plan), 0), 0);
-      const remaining = netIncome - totalExp;
-      const catCount = plan.expenses.categories.filter(c => !c.disabled).length;
-      return { netIncome, totalExp, remaining, catCount };
-    }
 
     /* ─── Render ─── */
     function render() {
@@ -76,38 +58,19 @@
     }
 
     function makePlanCard(plan, data) {
-      const { netIncome, totalExp, remaining, catCount } = planStats(plan);
-      const over = remaining < 0;
-      const isActive = plan.id === data.activePlanId;
-
       const card = document.createElement('div');
       card.className = 'hub-card plan-card';
 
       card.innerHTML = `
         <div class="hub-card-header">
           <span class="hub-card-title">${esc(plan.name)}</span>
-          <div class="hub-card-actions">
-            <button class="hca-btn" data-action="rename" title="Rename">✎</button>
-            <button class="hca-btn" data-action="duplicate" title="Duplicate">⧉</button>
-            ${data.plans.length > 1 ? `<button class="hca-btn danger" data-action="delete" title="Delete">×</button>` : ''}
-          </div>
         </div>
-        <div class="hub-card-stats">
-          <div class="hub-stat">
-            <span class="hub-stat-label">Net Income</span>
-            <span class="hub-stat-val income">${fmt(netIncome)}</span>
-          </div>
-          <div class="hub-stat">
-            <span class="hub-stat-label">Expenses</span>
-            <span class="hub-stat-val expense">${fmt(totalExp)}</span>
-          </div>
-          <div class="hub-stat">
-            <span class="hub-stat-label">Remaining</span>
-            <span class="hub-stat-val ${over ? 'expense' : 'income'}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
-          </div>
+        <div class="hub-card-actions-row">
+          <button class="hca-btn" data-action="rename" title="Rename">✎ Rename</button>
+          <button class="hca-btn" data-action="duplicate" title="Duplicate">⧉ Copy</button>
+          ${data.plans.length > 1 ? `<button class="hca-btn danger" data-action="delete" title="Delete">× Delete</button>` : ''}
         </div>
-        <div class="hub-card-meta">${catCount} expense categor${catCount === 1 ? 'y' : 'ies'}</div>
-        <button class="btn btn-primary hub-open-btn">Open Plan →</button>
+        <button class="btn btn-primary hub-open-btn">Open →</button>
       `;
 
       card.querySelector('[data-action="rename"]').addEventListener('click', (e) => {

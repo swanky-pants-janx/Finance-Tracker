@@ -1388,99 +1388,35 @@ input::placeholder { color: var(--muted); }
   vertical-align: middle;
 }
 
-/* Action buttons (rename, dupe, delete) */
-.hub-card-actions {
+/* ── Action buttons row inside card ── */
+.hub-card-actions-row {
   display: flex;
-  gap: 4px;
-  flex-shrink: 0;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .hca-btn {
-  width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 5px 10px;
   cursor: pointer;
   transition: all .15s;
-  padding: 0;
-  font-family: inherit;
+  white-space: nowrap;
 }
 .hca-btn:hover { background: var(--surface-2); color: var(--text); }
 .hca-btn.danger { color: var(--expense); border-color: rgba(248,81,73,.3); }
 .hca-btn.danger:hover { background: var(--expense-bg); border-color: var(--expense); }
 
-/* Stat grid inside card */
-.hub-card-stats {
-  display: flex;
-  gap: 10px;
-}
-.hub-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  background: var(--surface-2);
-  border-radius: var(--r);
-  padding: 8px 10px;
-}
-.hub-stat-label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: var(--muted);
-}
-.hub-stat-val {
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.3px;
-}
-.hub-stat-val.income { color: var(--income); }
-.hub-stat-val.expense { color: var(--expense); }
-
-.hub-card-meta {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: -6px;
-}
-
 .hub-open-btn {
   margin-top: auto;
   font-size: 14px;
   padding: 10px 16px;
-}
-
-/* ── Budget progress bar ── */
-.hub-progress-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.hub-progress-track {
-  flex: 1;
-  height: 5px;
-  background: var(--surface-3);
-  border-radius: 99px;
-  overflow: hidden;
-}
-.hub-progress-fill {
-  height: 100%;
-  border-radius: 99px;
-  background: var(--accent);
-  transition: width .3s ease;
-  min-width: 0;
-}
-.hub-progress-fill.over { background: var(--expense); }
-.hub-progress-pct {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  flex-shrink: 0;
-  width: 32px;
-  text-align: right;
 }
 
 /* ── New card ── */

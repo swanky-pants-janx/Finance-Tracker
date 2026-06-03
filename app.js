@@ -226,6 +226,11 @@ const State = {
     };
   },
 
+  flush: async () => {
+    clearTimeout(State._syncTimer);
+    await State._flushToDb();
+  },
+
   deleteBudget: (budgetId) => {
     if (!State._cache?.budgets) return;
     State._cache.budgets = State._cache.budgets.filter(b => b.id !== budgetId);
