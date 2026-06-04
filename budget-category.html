@@ -105,8 +105,12 @@
     function renderCatChart(cat) {
       if (catChart) { catChart.destroy(); catChart = null; }
 
-      const items = cat.items;
-      if (items.length === 0) {
+      const totalAllocated = cat.items.reduce((s, i) => s + (i.allocatedAmount || 0), 0);
+      const totalSpent     = cat.items.reduce((s, i) => s + itemSpent(i), 0);
+      const remaining      = Math.max(0, totalAllocated - totalSpent);
+      const over           = totalSpent > totalAllocated;
+
+      if (totalAllocated === 0 && totalSpent === 0) {
         document.getElementById('chartBox').classList.add('hidden');
         document.getElementById('chartEmpty').classList.remove('hidden');
         document.getElementById('catLegend').innerHTML = '';
@@ -116,18 +120,20 @@
       document.getElementById('chartBox').classList.remove('hidden');
       document.getElementById('chartEmpty').classList.add('hidden');
 
-      const values = items.map(i => i.allocatedAmount || 0);
-      const chartValues = values.every(v => v === 0) ? items.map(() => 1) : values;
-      const chartTotal = values.reduce((s, v) => s + v, 0);
+      const spentPct     = totalAllocated > 0 ? ((totalSpent / totalAllocated) * 100).toFixed(1) : '0.0';
+      const remainingPct = totalAllocated > 0 ? ((remaining  / totalAllocated) * 100).toFixed(1) : '0.0';
+
+      const displayVals = [totalSpent, remaining].every(v => v === 0) ? [0, 1] : [totalSpent, remaining];
+      const bgColors    = ['#f85149', over ? '#3d5a80' : '#3fb950'];
 
       Chart.defaults.color = '#7d8a9e';
       catChart = new Chart(document.getElementById('catChart'), {
         type: 'doughnut',
         data: {
-          labels: items.map(i => i.name),
+          labels: ['Spent', 'Remaining'],
           datasets: [{
-            data: chartValues,
-            backgroundColor: COLORS.slice(0, items.length),
+            data: displayVals,
+            backgroundColor: bgColors,
             borderColor: '#161b27',
             borderWidth: 2,
             hoverOffset: 18
@@ -135,18 +141,16 @@
         },
         options: {
           responsive: true, maintainAspectRatio: true, aspectRatio: 1,
-          cutout: '60%',
+          cutout: '62%',
           layout: { padding: 16 },
           plugins: {
             legend: { display: false },
             tooltip: {
               callbacks: {
                 label: (ctx) => {
-                  const item = items[ctx.dataIndex];
-                  const spent = itemSpent(item);
-                  const alloc = item.allocatedAmount;
-                  const pct = alloc > 0 ? ((spent / alloc) * 100).toFixed(1) : '0.0';
-                  return ` Spent: ${fmt(spent)}  /  ${fmt(alloc)}  (${pct}%)`;
+                  const val = ctx.label === 'Spent' ? totalSpent : remaining;
+                  const pct = totalAllocated > 0 ? ((val / totalAllocated) * 100).toFixed(1) : 0;
+                  return ` ${fmt(val)}  (${pct}% of budget)`;
                 }
               }
             }
@@ -156,17 +160,16 @@
 
       const legend = document.getElementById('catLegend');
       legend.innerHTML = '';
-      items.forEach((item, i) => {
-        const spent = itemSpent(item);
-        const alloc = item.allocatedAmount;
-        const pct = alloc > 0 ? ((spent / alloc) * 100).toFixed(1) : '0.0';
-        const over = spent > alloc;
+      [
+        { label: 'Spent',     val: totalSpent, color: '#f85149', pct: spentPct },
+        { label: 'Remaining', val: remaining,  color: over ? '#3d5a80' : '#3fb950', pct: remainingPct }
+      ].forEach(row => {
         const el = document.createElement('div');
         el.className = 'leg-item';
         el.innerHTML = `
-          <div class="leg-dot" style="background:${COLORS[i % COLORS.length]}"></div>
-          <span class="leg-name">${esc(item.name)}</span>
-          <span class="leg-pct${over ? ' over' : ''}">${pct}%</span>
+          <div class="leg-dot" style="background:${row.color}"></div>
+          <span class="leg-name">${row.label}</span>
+          <span class="leg-pct">${fmt(row.val)} <span style="color:var(--muted);font-weight:400">(${row.pct}%)</span></span>
         `;
         legend.appendChild(el);
       });
