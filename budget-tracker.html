@@ -50,6 +50,7 @@
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     let currentBudget = null;
+    let selectedCatId = null;
 
     /* ─── Helpers ─── */
     function monthLabel(key) {
@@ -65,6 +66,11 @@
     }
     function catSpent(cat) { return cat.items.reduce((s, i) => s + itemSpent(i), 0); }
     function catAllocated(cat) { return cat.items.reduce((s, i) => s + i.allocatedAmount, 0); }
+    function formatDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    }
 
     /* ─── Summary numbers ─── */
     function budgetSummary(budget) {
@@ -78,45 +84,27 @@
 
     /* ─── Chart ─── */
     const COLORS = ['#7c6af5','#58a6ff','#f85149','#3fb950','#fb923c','#a78bfa','#38bdf8','#fbbf24','#4ade80','#f472b6'];
-    const REMAINING_COLOR = '#3d5a80';
     let summaryChart = null;
 
     function renderChart(budget) {
       if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
 
-      const { totalSpent, surplus } = budgetSummary(budget);
+      const { totalSpent } = budgetSummary(budget);
       const remaining = Math.max(0, budget.netIncome - totalSpent);
       const over = totalSpent > budget.netIncome;
 
-      const chartBox   = document.getElementById('btChartBox');
-      const chartEmpty = document.getElementById('btChartEmpty');
-
-      chartBox.classList.remove('hidden');
-      chartEmpty.classList.add('hidden');
-
-      const SPENT_COLOR     = '#f85149'; // red
-      const REMAINING_COLOR_CHART = over ? '#f85149' : '#3fb950'; // green when within budget
-      const SURPLUS_COLOR   = '#3d5a80'; // muted blue
-
-      // Two slices: spent + remaining budget
       const spentPct     = budget.netIncome > 0 ? ((totalSpent / budget.netIncome) * 100).toFixed(1) : '0.0';
       const remainingPct = budget.netIncome > 0 ? ((remaining / budget.netIncome) * 100).toFixed(1) : '100.0';
-
-      const chartVals  = [totalSpent, remaining];
-      const chartLabels = ['Spent', 'Remaining'];
-      const bgColors   = ['#f85149', over ? '#3d5a80' : '#3fb950'];
-
-      // If nothing spent yet, show a subtle placeholder
-      const displayVals = chartVals.every(v => v === 0) ? [0, 1] : chartVals;
+      const displayVals  = [totalSpent, remaining].every(v => v === 0) ? [0, 1] : [totalSpent, remaining];
 
       Chart.defaults.color = '#7d8a9e';
       summaryChart = new Chart(document.getElementById('btChart'), {
         type: 'doughnut',
         data: {
-          labels: chartLabels,
+          labels: ['Spent', 'Remaining'],
           datasets: [{
             data: displayVals,
-            backgroundColor: bgColors,
+            backgroundColor: ['#f85149', over ? '#3d5a80' : '#3fb950'],
             borderColor: '#161b27',
             borderWidth: 2,
             hoverOffset: 18
@@ -141,13 +129,11 @@
         }
       });
 
-      // Legend — two simple rows
       const legend = document.getElementById('btChartLegend');
       legend.innerHTML = '';
-
       [
-        { label: 'Spent',     val: totalSpent, color: '#f85149', pct: spentPct },
-        { label: 'Remaining', val: remaining,  color: over ? '#3d5a80' : '#3fb950', pct: remainingPct }
+        { label: 'Spent',     val: totalSpent, color: '#f85149',                          pct: spentPct },
+        { label: 'Remaining', val: remaining,  color: over ? '#3d5a80' : '#3fb950',       pct: remainingPct }
       ].forEach(row => {
         const el = document.createElement('div');
         el.className = 'leg-item';
@@ -178,61 +164,41 @@
         return;
       }
 
-      // Auto-sync plan changes into budget on every load
       State.syncBudgetFromPlan(currentBudget);
       State.saveBudget(currentBudget);
 
-      // Show the table-view toggle now that we have a budget
       document.getElementById('viewToggleBtn').classList.remove('hidden');
 
-      // Three-column layout matching finance-app structure
+      // Validate selectedCatId still exists
+      if (selectedCatId && !currentBudget.categories.find(c => c.id === selectedCatId)) {
+        selectedCatId = null;
+      }
+      // Auto-select first category if none selected
+      if (!selectedCatId && currentBudget.categories.length > 0) {
+        selectedCatId = currentBudget.categories[0].id;
+      }
+
       const board = document.createElement('div');
       board.className = 'bt-board';
 
-      // Left: categories list (no header, just cards)
+      // Left: category nav
       const catsCol = document.createElement('div');
       catsCol.className = 'bt-col bt-cats-col';
       catsCol.innerHTML = `<div class="col-scroll" id="catsScroll"></div>`;
 
-      // Middle: summary stats
-      const statsCol = document.createElement('div');
-      statsCol.className = 'bt-col bt-stats-col';
-      const { totalAllocated, totalSpent, surplus } = budgetSummary(currentBudget);
-      const unallocated = currentBudget.netIncome - totalAllocated;
-      statsCol.innerHTML = `
-        <div class="col-header">
-          <div class="col-label">Surplus</div>
-          <div class="remaining-amt${surplus < 0 ? ' neg' : ''}">${surplus < 0 ? '−' : ''}${fmt(Math.abs(surplus))}</div>
-        </div>
-        <div class="bt-stats-body">
-          <div class="bt-stat-row">
-            <span class="bt-stat-label">Net Income</span>
-            <span class="bt-stat-val income">${fmt(currentBudget.netIncome)}</span>
-          </div>
-          <div class="bt-stat-row">
-            <span class="bt-stat-label">Allocated</span>
-            <span class="bt-stat-val">${fmt(totalAllocated)}</span>
-          </div>
-          <div class="bt-stat-row">
-            <span class="bt-stat-label">Spent</span>
-            <span class="bt-stat-val expense">${fmt(totalSpent)}</span>
-          </div>
-          ${unallocated > 0 ? `
-          <div class="bt-stat-row">
-            <span class="bt-stat-label">Unallocated</span>
-            <span class="bt-stat-val blue">${fmt(unallocated)}</span>
-          </div>` : ''}
-        </div>
-        ${renderDangerZone(currentBudget).outerHTML}
-      `;
+      // Middle: category detail
+      const detailCol = document.createElement('div');
+      detailCol.className = 'bt-col bt-detail-col';
+      detailCol.id = 'btDetailCol';
 
       // Right: pie chart
       const chartCol = document.createElement('div');
       chartCol.className = 'bt-col bt-chart-col';
+      const { surplus } = budgetSummary(currentBudget);
       chartCol.innerHTML = `
         <div class="summary-top col-header">
           <div class="col-label">Spending</div>
-          <div class="remaining-amt${budgetSummary(currentBudget).surplus < 0 ? ' neg' : ''}">${fmt(Math.abs(budgetSummary(currentBudget).surplus))} ${budgetSummary(currentBudget).surplus < 0 ? 'over' : 'left'}</div>
+          <div class="remaining-amt${surplus < 0 ? ' neg' : ''}">${fmt(Math.abs(surplus))} ${surplus < 0 ? 'over' : 'left'}</div>
         </div>
         <div class="summary-bottom">
           <div id="btChartBox"><canvas id="btChart"></canvas></div>
@@ -244,24 +210,15 @@
         </div>
       `;
 
-      board.append(catsCol, statsCol, chartCol);
+      board.append(catsCol, detailCol, chartCol);
       wrap.appendChild(board);
 
-      // Render category cards
       renderCategoryCards(currentBudget, document.getElementById('catsScroll'));
-
-      // Render chart
+      renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
       renderChart(currentBudget);
-
-      // Re-wire danger zone buttons (innerHTML loses event listeners)
-      wrap.querySelector('.bt-delete-month-btn')?.addEventListener('click', () => {
-        if (!confirm(`Delete the budget for ${monthLabel(currentBudget.month)}? This will erase all transactions and cannot be undone.`)) return;
-        State.deleteBudget(currentBudget.id);
-        window.location.href = 'budget-hub.html';
-      });
     }
 
-    /* ─── Category cards ─── */
+    /* ─── Category nav cards ─── */
     function renderCategoryCards(budget, container) {
       container.innerHTML = '';
       if (budget.categories.length === 0) {
@@ -280,9 +237,10 @@
       const over = remaining < 0;
       const pct = alloc > 0 ? Math.min((spent / alloc) * 100, 100) : 0;
       const color = COLORS[colorIdx % COLORS.length];
+      const isActive = cat.id === selectedCatId;
 
       const wrap = document.createElement('div');
-      wrap.className = 'bt-cat-card-wrap';
+      wrap.className = 'bt-cat-card-wrap' + (isActive ? ' active' : '');
       wrap.style.setProperty('--cat-color', color);
       wrap.style.cursor = 'pointer';
 
@@ -307,28 +265,182 @@
       `;
 
       wrap.append(card, barWrap);
-      wrap.addEventListener('click', async () => {
-        await State.flush();
-        window.location.href = `budget-category.html?month=${monthKeyFromUrl()}&catId=${cat.id}`;
+      wrap.addEventListener('click', () => {
+        selectedCatId = cat.id;
+        // Update active state on cards without full re-render
+        document.querySelectorAll('.bt-cat-card-wrap').forEach(el => el.classList.remove('active'));
+        wrap.classList.add('active');
+        renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
       });
       return wrap;
     }
 
-    /* ─── Danger zone ─── */
-    function renderDangerZone(budget) {
-      const div = document.createElement('div');
-      div.className = 'bt-danger-zone';
+    /* ─── Category detail panel ─── */
+    function renderCatDetail(budget, container) {
+      container.innerHTML = '';
+      const cat = budget.categories.find(c => c.id === selectedCatId);
 
-      const planNote = document.createElement('div');
-      planNote.className = 'bt-active-plan-note';
-      planNote.textContent = budget.planName ? `Based on: ${budget.planName}` : '';
+      if (!cat) {
+        container.innerHTML = `<div class="bt-detail-empty"><div class="empty-items-icon">👈</div><div>Select a category</div></div>`;
+        return;
+      }
 
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn bt-delete-month-btn';
-      delBtn.textContent = 'Delete this month\'s budget';
+      const spent = catSpent(cat);
+      const alloc = catAllocated(cat);
+      const over  = spent > alloc;
 
-      div.append(planNote, delBtn);
-      return div;
+      // Header
+      const head = document.createElement('div');
+      head.className = 'items-head';
+      head.innerHTML = `
+        <span class="items-head-title">${esc(cat.name)}</span>
+        <div class="bc-head-stats">
+          <span class="bc-spent-val${over ? ' over' : ' expense'}">${fmt(spent)}</span>
+          <span class="bc-head-sep"> / </span>
+          <span class="bc-alloc-val">${fmt(alloc)}</span>
+        </div>
+      `;
+
+      // Items scroll
+      const scroll = document.createElement('div');
+      scroll.className = 'items-scroll';
+
+      if (cat.items.length === 0) {
+        scroll.innerHTML = `<div class="empty-items"><div class="empty-items-icon">📋</div><div>No items in this category</div><div style="color:var(--muted);font-size:12px;margin-top:4px">Add items in the Finance Planner</div></div>`;
+      } else {
+        cat.items.forEach(item => {
+          scroll.appendChild(item.type === 'fixed'
+            ? makeFixedRow(item, cat, budget)
+            : makeVariableSection(item, cat, budget));
+        });
+      }
+
+      container.append(head, scroll);
+    }
+
+    /* ─── Fixed item ─── */
+    function makeFixedRow(item, cat, budget) {
+      const row = document.createElement('div');
+      row.className = 'item-row bc-fixed-row';
+      row.innerHTML = `
+        <label class="bc-fixed-label">
+          <input type="checkbox" class="bt-checkbox" ${item.paid ? 'checked' : ''}>
+          <span class="item-name${item.paid ? ' paid' : ''}">${esc(item.name)}</span>
+        </label>
+        <span class="item-amt">${fmt(item.allocatedAmount)}</span>
+        <span class="item-type-badge fixed">Fixed</span>
+      `;
+      const cb = row.querySelector('.bt-checkbox');
+      cb.addEventListener('change', () => {
+        item.paid = cb.checked;
+        State.saveBudget(budget);
+        renderPage();
+      });
+      return row;
+    }
+
+    /* ─── Variable item ─── */
+    function makeVariableSection(item, cat, budget) {
+      const wrap = document.createElement('div');
+      wrap.className = 'bc-var-section';
+
+      const spent     = item.transactions.reduce((s, t) => s + t.amount, 0);
+      const remaining = item.allocatedAmount - spent;
+      const over      = remaining < 0;
+      const pct       = item.allocatedAmount > 0 ? Math.min((spent / item.allocatedAmount) * 100, 100) : 0;
+
+      const header = document.createElement('div');
+      header.className = 'item-row bc-var-header';
+      header.innerHTML = `
+        <span class="item-name">${esc(item.name)}</span>
+        <span class="item-type-badge variable">Variable</span>
+        <div class="bc-var-amounts">
+          <span class="${over ? 'over' : 'expense'}">${fmt(spent)}</span>
+          <span class="bc-sep"> / ${fmt(item.allocatedAmount)}</span>
+        </div>
+        <span class="bc-var-remaining${over ? ' over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
+      `;
+
+      const bar = document.createElement('div');
+      bar.className = 'bt-bar-track bc-var-bar';
+      bar.innerHTML = `<div class="bt-bar-fill${over ? ' over' : ''}" style="width:${pct}%"></div>`;
+
+      const txnSection = document.createElement('div');
+      txnSection.className = 'bc-txn-section';
+
+      const addFormEl = document.createElement('div');
+      addFormEl.className = 'bc-add-form';
+      renderAddForm(item, budget, addFormEl);
+
+      const listEl = document.createElement('div');
+      listEl.className = 'bc-txn-list';
+      renderTxnList(item, budget, listEl);
+
+      txnSection.append(addFormEl, listEl);
+      wrap.append(header, bar, txnSection);
+      return wrap;
+    }
+
+    function renderAddForm(item, budget, container) {
+      container.innerHTML = '';
+      const row = document.createElement('div');
+      row.className = 'bc-add-row';
+      row.innerHTML = `
+        <input type="number" class="bc-amt-input" placeholder="Amount" min="0" step="0.01">
+        <input type="text" class="bc-note-input" placeholder="Note (optional)">
+        <input type="date" class="bc-date-input">
+        <button class="btn btn-primary bc-save-btn">Add</button>
+      `;
+
+      const amtInput  = row.querySelector('.bc-amt-input');
+      const noteInput = row.querySelector('.bc-note-input');
+      const dateInput = row.querySelector('.bc-date-input');
+      dateInput.value = new Date().toISOString().split('T')[0];
+
+      const save = () => {
+        const amount = parseFloat(amtInput.value);
+        if (isNaN(amount) || amount <= 0) { amtInput.focus(); return; }
+        item.transactions.push({
+          id: State.genId(),
+          amount,
+          note: noteInput.value.trim(),
+          date: dateInput.value || new Date().toISOString().split('T')[0]
+        });
+        State.saveBudget(budget);
+        amtInput.value = '';
+        noteInput.value = '';
+        renderPage();
+      };
+
+      row.querySelector('.bc-save-btn').addEventListener('click', save);
+      amtInput.addEventListener('keydown', e => { if (e.key === 'Enter') noteInput.focus(); });
+      noteInput.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+      container.appendChild(row);
+    }
+
+    function renderTxnList(item, budget, container) {
+      container.innerHTML = '';
+      if (item.transactions.length === 0) {
+        container.innerHTML = `<div class="txn-empty">No transactions yet</div>`;
+        return;
+      }
+      const sorted = [...item.transactions].sort((a, b) => b.date.localeCompare(a.date));
+      sorted.forEach(txn => {
+        const row = document.createElement('div');
+        row.className = 'txn-row';
+        row.innerHTML = `
+          <span class="txn-date">${formatDate(txn.date)}</span>
+          <span class="txn-note">${esc(txn.note || '—')}</span>
+          <span class="txn-amt">${fmt(txn.amount)}</span>
+          <button class="txn-del">×</button>
+        `;
+        row.querySelector('.txn-del').addEventListener('click', () => {
+          item.transactions = item.transactions.filter(t => t.id !== txn.id);
+          State.saveBudget(budget);
+          renderPage();
+        });
+        container.appendChild(row);
+      });
     }
 
     /* ─── Start prompt ─── */
@@ -405,18 +517,11 @@
       }
     }
 
-    function formatDate(iso) {
-      if (!iso) return '';
-      const [y, m, d] = iso.split('-');
-      return `${d}/${m}/${y}`;
-    }
-
     function buildTableView() {
       if (!currentBudget) return;
       const tbody = document.getElementById('budgetTableBody');
       tbody.innerHTML = '';
       const netIncome = currentBudget.netIncome;
-      const pct = (amt) => netIncome > 0 ? ((amt / netIncome) * 100).toFixed(1) + '%' : '—';
 
       function addRow(cells, cls) {
         const tr = document.createElement('tr');
@@ -438,7 +543,6 @@
         const catSpentAmt = cat.items.reduce((s, i) => s + itemSpent(i), 0);
         const catRem      = catAlloc - catSpentAmt;
 
-        // Category header row
         addRow([
           { text: cat.name, cls: 'td-category expense-cat' },
           { text: '', colspan: 3 },
@@ -453,7 +557,6 @@
           const over  = spent > item.allocatedAmount;
 
           if (item.type === 'fixed') {
-            // Fixed: single row with paid/unpaid status
             addRow([
               { text: '' },
               { text: item.name, cls: 'td-item' },
@@ -467,7 +570,6 @@
               { text: item.paid ? '—' : fmt(item.allocatedAmount), cls: 'td-amount' + (item.paid ? '' : ' td-muted') }
             ], 'tr-item');
           } else {
-            // Variable: item summary row
             addRow([
               { text: '' },
               { text: item.name, cls: 'td-item' },
@@ -478,7 +580,6 @@
               { text: (rem < 0 ? '−' : '') + fmt(Math.abs(rem)), cls: 'td-amount' + (rem < 0 ? ' td-neg' : '') }
             ], 'tr-item');
 
-            // Individual transactions as sub-rows
             const sorted = [...item.transactions].sort((a, b) => a.date.localeCompare(b.date));
             sorted.forEach(txn => {
               addRow([
@@ -505,7 +606,6 @@
         totalSpent     += catSpentAmt;
       });
 
-      // Totals row
       const totalRem = totalAllocated - totalSpent;
       addRow([
         { text: 'Total', cls: 'td-total td-expense-total', colspan: 4 },
@@ -514,13 +614,11 @@
         { text: (totalRem < 0 ? '−' : '') + fmt(Math.abs(totalRem)), cls: 'td-amount td-total td-expense-total' + (totalRem < 0 ? ' td-neg' : '') }
       ], 'tr-total tr-expense-total');
 
-      // Surplus row
       const surplus = netIncome - totalSpent;
       addRow([
         { text: 'Net Income', cls: 'td-remaining', colspan: 4 },
         { text: fmt(netIncome), cls: 'td-amount td-remaining' },
-        { text: '' },
-        { text: '' }
+        { text: '' }, { text: '' }
       ], 'tr-remaining');
       addRow([
         { text: 'Surplus', cls: 'td-remaining', colspan: 4 },

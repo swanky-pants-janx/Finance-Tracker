@@ -1349,36 +1349,29 @@ input::placeholder { color: var(--muted); }
   min-width: 0;
 }
 .bt-col:last-child { border-bottom: none; }
-.bt-cats-col { flex: none; }
-.bt-stats-col { flex: none; overflow-y: visible; }
-.bt-chart-col { flex: none; overflow-y: visible; }
+.bt-cats-col  { flex: none; }
+.bt-detail-col { flex: none; overflow-y: visible; }
+.bt-chart-col  { flex: none; overflow-y: visible; }
 
-/* Stats column body */
-.bt-stats-body {
+/* Detail column empty state */
+.bt-detail-empty {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 8px 0;
-}
-.bt-stat-row {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border-sub);
+  justify-content: center;
+  height: 100%;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 14px;
 }
-.bt-stat-row:last-child { border-bottom: none; }
-.bt-stat-label { font-size: 14px; color: var(--muted); font-weight: 500; }
-.bt-stat-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.bt-stat-val.income { color: var(--income); }
-.bt-stat-val.expense { color: var(--expense); }
-.bt-stat-val.blue { color: #58a6ff; }
+.bt-detail-empty .empty-items-icon { font-size: 32px; }
 
-/* Danger zone inside stats column */
-.bt-stats-col .bt-danger-zone {
-  margin: 16px;
-  flex-direction: column;
-  align-items: flex-start;
+/* Active category card highlight */
+.bt-cat-card-wrap.active .bt-cat-nav-card {
+  background: color-mix(in srgb, var(--cat-color) 12%, var(--card));
+}
+.bt-cat-card-wrap.active .bt-cat-nav-card::before {
+  width: 4px;
 }
 
 /* Category nav cards */
@@ -2214,9 +2207,9 @@ input::placeholder { color: var(--muted); }
   .bt-board { flex-direction: row; flex: 1; height: calc(100vh - 64px); overflow: hidden; }
   .bt-col { border-right: 1px solid var(--border); border-bottom: none; }
   .bt-col:last-child { border-right: none; }
-  .bt-cats-col { flex: 1.2; overflow-y: auto; }
-  .bt-stats-col { flex: 1; overflow-y: auto; }
-  .bt-chart-col { flex: 1.2; overflow-y: auto; }
+  .bt-cats-col   { flex: 1; overflow-y: auto; }
+  .bt-detail-col { flex: 2; overflow-y: auto; }
+  .bt-chart-col  { flex: 1; overflow-y: auto; }
 
   /* bc-add-row: inline on desktop */
   .bc-date-input { width: 140px; }

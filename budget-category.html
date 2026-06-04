@@ -44,20 +44,6 @@
         <div class="chart-legend" id="catLegend"></div>
       </div>
 
-      <div class="chart-divider"></div>
-
-      <div class="chart-section">
-        <div class="chart-section-header">
-          <div class="col-label">Budget surplus</div>
-          <div class="chart-remaining-amt" id="chartSurplus">R 0.00</div>
-        </div>
-        <div class="chart-box-wrap"><div id="overallChartBox"><canvas id="overallChart"></canvas></div></div>
-        <div id="overallChartEmpty" class="empty-chart hidden">
-          <div class="empty-chart-icon">🥧</div>
-          <div>No budget data yet</div>
-        </div>
-      </div>
-
     </div>
   </div>
 
@@ -100,7 +86,6 @@
     const COLORS = ['#7c6af5','#58a6ff','#f85149','#3fb950','#fb923c','#a78bfa','#38bdf8','#fbbf24','#4ade80','#f472b6'];
     const REMAINING_COLOR = '#3d5a80';
     let catChart = null;
-    let overallChart = null;
 
     function renderCatChart(cat) {
       if (catChart) { catChart.destroy(); catChart = null; }
