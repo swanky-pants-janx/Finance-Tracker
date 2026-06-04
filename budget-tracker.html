@@ -12,7 +12,7 @@
     <button class="nav-back" onclick="State.flush().then(()=>window.location.href='budget-hub.html')">← Back</button>
     <span class="nav-title" id="navTitle">Budget Tracker</span>
     <div class="nav-actions">
-      <button class="btn btn-ghost view-toggle-btn hidden" id="viewToggleBtn" onclick="toggleView()">⊞ Table View</button>
+      <button class="btn btn-ghost view-toggle-btn hidden" id="viewToggleBtn" onclick="toggleView()">Table View</button>
     </div>
   </nav>
 
@@ -203,7 +203,7 @@
         <div class="summary-bottom">
           <div id="btChartBox"><canvas id="btChart"></canvas></div>
           <div id="btChartEmpty" class="empty-chart hidden">
-            <div class="empty-chart-icon">🥧</div>
+            <span class="svg-icon icon-tracker empty-svg-icon"></span>
             <div>Add categories to see the breakdown</div>
           </div>
           <div class="chart-legend" id="btChartLegend"></div>
@@ -222,7 +222,7 @@
     function renderCategoryCards(budget, container) {
       container.innerHTML = '';
       if (budget.categories.length === 0) {
-        container.innerHTML = `<div class="empty-items" style="padding:24px"><div class="empty-items-icon">📋</div><div>No expense categories yet</div><a href="finance-plans.html" class="btn btn-ghost" style="margin-top:10px">Go to Finance Planner</a></div>`;
+        container.innerHTML = `<div class="empty-items" style="padding:24px"><span class="svg-icon icon-planner empty-svg-icon"></span><div>No expense categories yet</div><a href="finance-plans.html" class="btn btn-ghost" style="margin-top:10px">Go to Finance Planner</a></div>`;
         return;
       }
       budget.categories.forEach((cat, i) => {
@@ -306,7 +306,7 @@
       scroll.className = 'items-scroll';
 
       if (cat.items.length === 0) {
-        scroll.innerHTML = `<div class="empty-items"><div class="empty-items-icon">📋</div><div>No items in this category</div><div style="color:var(--muted);font-size:12px;margin-top:4px">Add items in the Finance Planner</div></div>`;
+        scroll.innerHTML = `<div class="empty-items"><span class="svg-icon icon-planner empty-svg-icon"></span><div>No items in this category</div><div style="color:var(--muted);font-size:12px;margin-top:4px">Add items in the Finance Planner</div></div>`;
       } else {
         cat.items.forEach(item => {
           scroll.appendChild(item.type === 'fixed'
@@ -432,7 +432,7 @@
           <span class="txn-date">${formatDate(txn.date)}</span>
           <span class="txn-note">${esc(txn.note || '—')}</span>
           <span class="txn-amt">${fmt(txn.amount)}</span>
-          <button class="txn-del">×</button>
+          <button class="txn-del" title="Delete"><span class="svg-icon icon-delete" style="width:14px;height:14px"></span></button>
         `;
         row.querySelector('.txn-del').addEventListener('click', () => {
           item.transactions = item.transactions.filter(t => t.id !== txn.id);
@@ -451,7 +451,7 @@
 
       const icon = document.createElement('div');
       icon.className = 'bt-start-icon';
-      icon.textContent = '💳';
+      icon.innerHTML = '<span class="svg-icon icon-tracker" style="width:48px;height:48px;color:var(--muted);opacity:0.5"></span>';
 
       const h2 = document.createElement('h2');
       h2.textContent = `No budget for ${monthLabel(monthKey)}`;
@@ -509,11 +509,11 @@
         board.classList.add('hidden');
         table.classList.remove('hidden');
         buildTableView();
-        btn.textContent = '⊟ Board View';
+        btn.textContent = 'Board View';
       } else {
         board.classList.remove('hidden');
         table.classList.add('hidden');
-        btn.textContent = '⊞ Table View';
+        btn.textContent = 'Table View';
       }
     }
 

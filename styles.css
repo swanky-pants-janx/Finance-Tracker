@@ -254,6 +254,35 @@ input::placeholder { color: var(--muted); }
   opacity: .3;
   pointer-events: none;
 }
+/* ─── SVG icon system ─────────────────────────────────────────────────────── */
+.svg-icon {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.icon-planner { -webkit-mask-image: url('icons/Planner.svg'); mask-image: url('icons/Planner.svg'); }
+.icon-tracker { -webkit-mask-image: url('icons/Tracker.svg'); mask-image: url('icons/Tracker.svg'); }
+.icon-savings { -webkit-mask-image: url('icons/Save.svg');    mask-image: url('icons/Save.svg'); }
+.icon-rename  { -webkit-mask-image: url('icons/Rename.svg');  mask-image: url('icons/Rename.svg'); }
+.icon-copy    { -webkit-mask-image: url('icons/Copy.svg');    mask-image: url('icons/Copy.svg'); }
+.icon-delete  { -webkit-mask-image: url('icons/Delete.svg');  mask-image: url('icons/Delete.svg'); }
+
+/* Tile icons — large, white */
+.tile-svg-icon { width: 30px; height: 30px; color: rgba(255,255,255,0.82); }
+
+/* Action button icons — small, inherit button colour */
+.btn-svg-icon  { width: 16px; height: 16px; }
+
+/* Empty-state icons — medium, muted */
+.empty-svg-icon { width: 36px; height: 36px; color: var(--muted); opacity: 0.35; display: block; margin: 0 auto 8px; }
+
 .tile-icon {
   width: 56px; height: 56px;
   border-radius: 16px;
@@ -2159,6 +2188,7 @@ input::placeholder { color: var(--muted); }
   }
   .app-tile { padding: 26px 18px; }
   .tile-icon { width: 60px; height: 60px; font-size: 28px; }
+  .tile-svg-icon { width: 34px; height: 34px; }
   .tile-label { font-size: 13px; }
 
   /* Finance app: side-by-side columns */

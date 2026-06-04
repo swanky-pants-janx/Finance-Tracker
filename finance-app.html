@@ -13,7 +13,7 @@
     <button class="nav-back" onclick="State.flush().then(()=>window.location.href='finance-plans.html')">← Back</button>
     <span class="nav-title">Finance Planner</span>
     <div class="nav-actions">
-      <button class="btn btn-ghost view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">⊞ Table View</button>
+      <button class="btn btn-ghost view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">Table View</button>
     </div>
   </nav>
 
@@ -51,7 +51,7 @@
           <button id="chartModeBtn" class="chart-mode-btn" title="Toggle categories / items view">By category</button>
         </div>
         <div id="summaryChartEmpty" class="empty-chart hidden">
-          <div class="empty-chart-icon">🥧</div>
+          <span class="svg-icon icon-planner empty-svg-icon"></span>
           <div>Add expense categories<br>to see the breakdown</div>
         </div>
         <div class="chart-legend" id="summaryLegend"></div>
@@ -223,7 +223,7 @@
         <span class="card-name">${esc(cat.name)}</span>
         <span class="card-amt">${fmt(total)}</span>
         <button class="card-toggle ${cat.disabled ? 'is-disabled' : ''}" title="${toggleTitle}">${toggleIcon}</button>
-        <button class="card-del" title="Delete">×</button>
+        <button class="card-del" title="Delete"><span class="svg-icon icon-delete btn-svg-icon"></span></button>
       `;
 
       // Navigate (not on action buttons)
@@ -503,11 +503,11 @@
         board.classList.add('hidden');
         tableView.classList.remove('hidden');
         buildTableView();
-        btn.textContent = '⊟ Board View';
+        btn.textContent = 'Board View';
       } else {
         board.classList.remove('hidden');
         tableView.classList.add('hidden');
-        btn.textContent = '⊞ Table View';
+        btn.textContent = 'Table View';
       }
     }
 
