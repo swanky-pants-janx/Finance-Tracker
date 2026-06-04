@@ -21,6 +21,9 @@
   <!-- Table view (hidden by default) -->
   <div class="table-view hidden" id="tableView">
     <div class="table-wrap">
+      <div class="table-toolbar">
+        <button class="btn btn-ghost table-dl-btn" onclick="downloadTableCSV()">↓ Download CSV</button>
+      </div>
       <table class="finance-table" id="budgetTable">
         <thead>
           <tr>
@@ -525,6 +528,51 @@
         { text: (surplus < 0 ? '−' : '') + fmt(Math.abs(surplus)), cls: 'td-amount td-remaining' + (surplus < 0 ? ' td-neg' : '') },
         { text: '' }
       ], 'tr-remaining');
+    }
+
+    /* ─── CSV Download ─── */
+    function downloadTableCSV() {
+      if (!currentBudget) return;
+      const monthName = monthLabel(currentBudget.month);
+      const rows = [['Category', 'Item / Date', 'Type', 'Note / Status', 'Allocated', 'Spent', 'Remaining']];
+
+      currentBudget.categories.forEach(cat => {
+        const catAlloc    = cat.items.reduce((s, i) => s + i.allocatedAmount, 0);
+        const catSpentAmt = cat.items.reduce((s, i) => s + itemSpent(i), 0);
+        const catRem      = catAlloc - catSpentAmt;
+        rows.push([cat.name, '', '', '', fmt(catAlloc), fmt(catSpentAmt), fmt(catRem)]);
+
+        cat.items.forEach(item => {
+          const spent = itemSpent(item);
+          const rem   = item.allocatedAmount - spent;
+          if (item.type === 'fixed') {
+            rows.push(['', item.name, 'Fixed', item.paid ? 'Paid' : 'Unpaid',
+              fmt(item.allocatedAmount), item.paid ? fmt(item.allocatedAmount) : '', item.paid ? '' : fmt(item.allocatedAmount)]);
+          } else {
+            rows.push(['', item.name, 'Variable', item.transactions.length + ' transaction(s)',
+              fmt(item.allocatedAmount), fmt(spent), fmt(rem)]);
+            const sorted = [...item.transactions].sort((a, b) => a.date.localeCompare(b.date));
+            sorted.forEach(txn => {
+              rows.push(['', txn.date, '', txn.note || '', '', fmt(txn.amount), '']);
+            });
+          }
+        });
+      });
+
+      const { totalAllocated, totalSpent, surplus } = budgetSummary(currentBudget);
+      const totalRem = totalAllocated - totalSpent;
+      rows.push(['Total', '', '', '', fmt(totalAllocated), fmt(totalSpent), fmt(totalRem)]);
+      rows.push(['Net Income', '', '', '', fmt(currentBudget.netIncome), '', '']);
+      rows.push(['Surplus', '', '', '', '', fmt(surplus), '']);
+
+      const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `${monthName.replace(/\s+/g, '_')}_budget.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     /* ─── Init ─── */
