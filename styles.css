@@ -221,10 +221,10 @@ input::placeholder { color: var(--muted); }
 .greeting p { font-size: 18px; color: var(--muted); line-height: 1.5; }
 
 .apps-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
-  width: 100%;
   max-width: 420px;
 }
 .app-tile {
@@ -2154,8 +2154,8 @@ input::placeholder { color: var(--muted); }
   /* Landing: larger hero */
   .greeting h1 { font-size: 56px; letter-spacing: -2px; }
   .apps-row {
-    grid-template-columns: repeat(6, 1fr);
-    max-width: 720px;
+    justify-content: center;
+    max-width: 520px;
   }
   .app-tile { padding: 26px 18px; }
   .tile-icon { width: 60px; height: 60px; font-size: 28px; }
