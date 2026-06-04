@@ -29,9 +29,10 @@ const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // ─── State ──────────────────────────────────────────────────────────────────
 const State = {
   // In-memory cache loaded once per page from Supabase
-  _cache: null,     // { finance: {...}, savings: [...] }
-  _session: null,   // Supabase session object
+  _cache: null,          // { finance: {...}, savings: [...] }
+  _session: null,        // Supabase session object
   _syncTimer: null,
+  _realtimeChannel: null,
 
   // ── Auth ──
 
@@ -298,6 +299,50 @@ const State = {
   flush: async () => {
     clearTimeout(State._syncTimer);
     await State._flushToDb();
+  },
+
+  // Call once per page after requireAuth.
+  // - Flushes local changes when page hides (back gesture, tab switch)
+  // - Reloads from DB and re-renders when page becomes visible again (other device may have changed data)
+  // - Subscribes to Supabase Realtime so changes from other devices appear instantly while this page is open
+  initSync: (renderFn) => {
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'hidden') {
+        State.flush();
+      } else {
+        if (!State._syncTimer) {
+          await State._loadFromDb();
+          renderFn();
+        }
+      }
+    });
+
+    const userId = State._session?.user?.id;
+    if (!userId || State._realtimeChannel) return;
+
+    State._realtimeChannel = _sb
+      .channel('fintrack_' + userId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'fintrack_data',
+        filter: `user_id=eq.${userId}`
+      }, (payload) => {
+        if (State._syncTimer) return;
+        const raw = payload.new?.data;
+        if (!raw) return;
+        if (raw.plans && !raw.finance) {
+          State._cache = { finance: raw, savings: [], budgets: [] };
+        } else {
+          State._cache = {
+            finance: raw.finance || State._defaultData().finance,
+            savings: raw.savings || [],
+            budgets: raw.budgets || []
+          };
+        }
+        renderFn();
+      })
+      .subscribe();
   },
 
   deleteBudget: (budgetId) => {

@@ -451,11 +451,7 @@
         window.location.href = `budget-tracker.html?month=${month}`;
       });
 
-      // Flush when tab/page becomes hidden (browser back gesture, tab switch, close)
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') State.flush();
-      });
-
+      State.initSync(renderPage);
       renderPage();
       initResizer();
     });

@@ -747,9 +747,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') State.flush();
-      });
+      State.initSync(renderPage);
       renderPage();
       initResizer();
       document.getElementById('navBack').addEventListener('click', async () => {

@@ -201,6 +201,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
+      State.initSync(render);
       render();
     });
   </script>
