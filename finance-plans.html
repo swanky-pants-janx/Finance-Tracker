@@ -64,9 +64,9 @@
           <span class="hub-card-title">${esc(plan.name)}</span>
         </div>
         <div class="hub-card-actions-row">
-          <button class="hca-btn" data-action="rename" title="Rename"><span class="svg-icon icon-rename btn-svg-icon"></span></button>
-          <button class="hca-btn" data-action="duplicate" title="Duplicate"><span class="svg-icon icon-copy btn-svg-icon"></span></button>
-          ${data.plans.length > 1 ? `<button class="hca-btn danger" data-action="delete" title="Delete"><span class="svg-icon icon-delete btn-svg-icon"></span></button>` : ''}
+          <button class="hca-btn" data-action="rename" title="Rename"><img src="icons/Rename.svg" class="svg-icon btn-svg-icon" alt=""></button>
+          <button class="hca-btn" data-action="duplicate" title="Duplicate"><img src="icons/Copy.svg" class="svg-icon btn-svg-icon" alt=""></button>
+          ${data.plans.length > 1 ? `<button class="hca-btn danger" data-action="delete" title="Delete"><img src="icons/Delete.svg" class="svg-icon btn-svg-icon" alt=""></button>` : ''}
         </div>
         <button class="btn btn-primary hub-open-btn">Open →</button>
       `;

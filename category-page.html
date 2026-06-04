@@ -38,7 +38,7 @@
         <div class="chart-title">Category breakdown</div>
         <div class="chart-box-wrap"><div id="chartBox"><canvas id="catChart"></canvas></div></div>
         <div id="chartEmpty" class="empty-chart hidden">
-          <span class="svg-icon icon-tracker empty-svg-icon"></span>
+          <img src="icons/Tracker.svg" class="svg-icon empty-svg-icon" alt="">
           <div>Add items to see<br>the breakdown</div>
         </div>
         <div class="chart-legend" id="catLegend"></div>
@@ -54,7 +54,7 @@
         </div>
         <div class="chart-box-wrap"><div id="overallChartBox"><canvas id="overallChart"></canvas></div></div>
         <div id="overallChartEmpty" class="empty-chart hidden">
-          <span class="svg-icon icon-tracker empty-svg-icon"></span>
+          <img src="icons/Tracker.svg" class="svg-icon empty-svg-icon" alt="">
           <div>No expense data yet</div>
         </div>
       </div>
@@ -205,7 +205,7 @@
         const empty = document.createElement('div');
         empty.className = 'empty-items';
         empty.innerHTML = `
-          <span class="svg-icon icon-planner empty-svg-icon"></span>
+          <img src="icons/Planner.svg" class="svg-icon empty-svg-icon" alt="">
           <div>No items yet</div>
           <div style="color:var(--muted);font-size:12px">Use the form above to add your first item</div>
         `;
@@ -633,7 +633,7 @@
         ${typeBadge}
         <span class="item-amt">${amtDisplay}</span>
         <button class="item-toggle ${item.disabled ? 'is-disabled' : ''}" title="${toggleTitle}">${toggleIcon}</button>
-        <button class="item-del" title="Delete"><span class="svg-icon icon-delete btn-svg-icon"></span></button>
+        <button class="item-del" title="Delete"><img src="icons/Delete.svg" class="svg-icon btn-svg-icon" alt=""></button>
       `;
 
       // Click row to edit (ignore action buttons and drag handle)

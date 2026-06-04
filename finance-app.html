@@ -51,7 +51,7 @@
           <button id="chartModeBtn" class="chart-mode-btn" title="Toggle categories / items view">By category</button>
         </div>
         <div id="summaryChartEmpty" class="empty-chart hidden">
-          <span class="svg-icon icon-planner empty-svg-icon"></span>
+          <img src="icons/Planner.svg" class="svg-icon empty-svg-icon" alt="">
           <div>Add expense categories<br>to see the breakdown</div>
         </div>
         <div class="chart-legend" id="summaryLegend"></div>
@@ -223,7 +223,7 @@
         <span class="card-name">${esc(cat.name)}</span>
         <span class="card-amt">${fmt(total)}</span>
         <button class="card-toggle ${cat.disabled ? 'is-disabled' : ''}" title="${toggleTitle}">${toggleIcon}</button>
-        <button class="card-del" title="Delete"><span class="svg-icon icon-delete btn-svg-icon"></span></button>
+        <button class="card-del" title="Delete"><img src="icons/Delete.svg" class="svg-icon btn-svg-icon" alt=""></button>
       `;
 
       // Navigate (not on action buttons)
