@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="flanner — interest calculator">
+  <meta name="theme-color" content="#000000">
+
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="flanner">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="social-banner.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="social-banner.svg">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <meta property="og:title" content="flanner — interest calculator">
+  <meta name="twitter:title" content="flanner — interest calculator">
+  <title>flanner — interest calculator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-interest {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-y: auto;
+    }
+
+    .ic-wrap {
+      flex: 1;
+      padding: 32px 24px;
+      max-width: 640px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .ic-section-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .ic-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ic-field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--bg);
+      border: 2px solid var(--border-sub);
+      padding: 20px 20px 18px;
+      transition: border-color .15s;
+    }
+
+    .ic-field:focus-within {
+      border-color: var(--border);
+    }
+
+    .ic-field label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+    }
+
+    .ic-field input {
+      border: none;
+      padding: 0;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -.5px;
+      background: transparent;
+      color: var(--text);
+      width: 100%;
+    }
+
+    .ic-field input:focus {
+      border: none;
+    }
+
+    .ic-field input::placeholder {
+      color: var(--surface-3);
+    }
+
+    .ic-calculate-btn {
+      width: 100%;
+    }
+
+    .ic-results {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ic-result-card {
+      background: var(--bg);
+      border: 2px solid var(--border-sub);
+      padding: 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ic-result-card.primary {
+      border-color: var(--border);
+    }
+
+    .ic-result-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+    }
+
+    .ic-result-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ic-result-val {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1;
+      flex: 1;
+    }
+
+    .ic-result-card.primary .ic-result-val {
+      color: var(--expense);
+    }
+
+    .ic-result-sub {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .ic-result-val-sm {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -.8px;
+      line-height: 1;
+      flex: 1;
+    }
+
+    .ic-copy-btn {
+      background: none;
+      border: 1px solid var(--border-sub);
+      border-radius: 0;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s;
+      flex-shrink: 0;
+      min-height: 44px;
+      min-width: 44px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .ic-copy-btn:hover {
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .ic-copy-btn.copied {
+      border-color: var(--income);
+      color: var(--income);
+    }
+
+    .ic-copy-btn img {
+      width: 16px;
+      height: 16px;
+      filter: brightness(0) invert(0.55);
+    }
+
+    .ic-copy-btn.copied img {
+      filter: brightness(0) saturate(100%) invert(68%) sepia(60%) saturate(400%) hue-rotate(90deg) brightness(1.1);
+    }
+
+    .ic-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 48px 24px;
+      color: var(--muted);
+      font-size: 15px;
+      text-align: center;
+      border: 2px dashed var(--border-sub);
+    }
+
+    .ic-empty-icon {
+      width: 40px;
+      height: 40px;
+      filter: brightness(0) invert(0.3);
+      opacity: 0.4;
+    }
+
+    @media (min-width: 768px) {
+      .ic-wrap {
+        padding: 40px 32px;
+      }
+
+      .ic-field input {
+        font-size: 32px;
+      }
+
+      .ic-result-val {
+        font-size: 44px;
+      }
+
+      .ic-result-val-sm {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body class="page-interest">
+
+  <nav class="top-nav">
+    <button class="nav-back" onclick="window.location.href='landing-page.html'">←</button>
+    <span class="nav-title">Interest Calculator</span>
+  </nav>
+
+  <div class="ic-wrap">
+
+    <div>
+      <p class="ic-section-label">Inputs</p>
+      <div class="ic-fields">
+        <div class="ic-field">
+          <label for="icPrice">Principal amount</label>
+          <input id="icPrice" type="number" inputmode="decimal" placeholder="0.00" min="0" step="any">
+        </div>
+        <div class="ic-field">
+          <label for="icRate">Annual interest rate (%)</label>
+          <input id="icRate" type="number" inputmode="decimal" placeholder="0.00" min="0" step="any">
+        </div>
+        <div class="ic-field">
+          <label for="icMonths">Repayment period (months)</label>
+          <input id="icMonths" type="number" inputmode="numeric" placeholder="0" min="1" step="1">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary ic-calculate-btn" id="calcBtn">Calculate</button>
+
+    <div id="resultsArea">
+      <p class="ic-section-label">Result</p>
+      <div class="ic-empty">
+        <img src="Icons/percentage-svgrepo-com.svg" class="ic-empty-icon" alt="">
+        <span>Enter your values above and hit Calculate</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    function fmt(n) {
+      return 'R ' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function copyResult(value, btn) {
+      const text = value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      navigator.clipboard.writeText(text).then(() => {
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 1800);
+      });
+    }
+
+    function makeCopyBtn(value) {
+      const btn = document.createElement('button');
+      btn.className = 'ic-copy-btn';
+      btn.title = 'Copy';
+      btn.innerHTML = '<img src="Icons/Copy.svg" alt="Copy">';
+      btn.addEventListener('click', () => copyResult(value, btn));
+      return btn;
+    }
+
+    function calculate() {
+      const principal = parseFloat(document.getElementById('icPrice').value);
+      const annualRate = parseFloat(document.getElementById('icRate').value);
+      const months = parseInt(document.getElementById('icMonths').value, 10);
+
+      const area = document.getElementById('resultsArea');
+
+      if (!principal || principal <= 0 || isNaN(annualRate) || annualRate < 0 || !months || months < 1) {
+        area.innerHTML = '<p class="ic-section-label">Result</p>' +
+          '<div class="ic-empty"><img src="Icons/percentage-svgrepo-com.svg" class="ic-empty-icon" alt=""><span>Please fill in all fields with valid values</span></div>';
+        return;
+      }
+
+      let monthlyPayment, totalPayment, totalInterest;
+
+      if (annualRate === 0) {
+        monthlyPayment = principal / months;
+        totalPayment = principal;
+        totalInterest = 0;
+      } else {
+        const r = annualRate / 100 / 12;
+        monthlyPayment = principal * (r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1);
+        totalPayment = monthlyPayment * months;
+        totalInterest = totalPayment - principal;
+      }
+
+      area.innerHTML = '<p class="ic-section-label">Result</p>';
+
+      const results = document.createElement('div');
+      results.className = 'ic-results';
+
+      // Total interest (primary highlight)
+      const interestCard = document.createElement('div');
+      interestCard.className = 'ic-result-card primary';
+      interestCard.innerHTML = '<span class="ic-result-label">Total interest paid</span>';
+      const interestRow = document.createElement('div');
+      interestRow.className = 'ic-result-row';
+      const interestVal = document.createElement('span');
+      interestVal.className = 'ic-result-val';
+      interestVal.textContent = fmt(totalInterest);
+      interestRow.append(interestVal, makeCopyBtn(totalInterest));
+      interestCard.append(interestRow);
+      results.append(interestCard);
+
+      // Monthly payment
+      const monthlyCard = document.createElement('div');
+      monthlyCard.className = 'ic-result-card';
+      monthlyCard.innerHTML = '<span class="ic-result-label">Monthly repayment</span>';
+      const monthlyRow = document.createElement('div');
+      monthlyRow.className = 'ic-result-row';
+      const monthlyVal = document.createElement('span');
+      monthlyVal.className = 'ic-result-val-sm';
+      monthlyVal.textContent = fmt(monthlyPayment);
+      monthlyRow.append(monthlyVal, makeCopyBtn(monthlyPayment));
+      monthlyCard.append(monthlyRow);
+      results.append(monthlyCard);
+
+      // Total repayment
+      const totalCard = document.createElement('div');
+      totalCard.className = 'ic-result-card';
+      totalCard.innerHTML = '<span class="ic-result-label">Total repayment</span>';
+      const totalRow = document.createElement('div');
+      totalRow.className = 'ic-result-row';
+      const totalVal = document.createElement('span');
+      totalVal.className = 'ic-result-val-sm';
+      totalVal.textContent = fmt(totalPayment);
+      const totalSub = document.createElement('span');
+      totalSub.className = 'ic-result-sub';
+      totalSub.style.fontSize = '13px';
+      totalSub.style.color = 'var(--muted)';
+      totalRow.append(totalVal, makeCopyBtn(totalPayment));
+      totalCard.append(totalRow);
+      totalCard.append(totalSub);
+      results.append(totalCard);
+
+      area.appendChild(results);
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', calculate);
+
+    ['icPrice', 'icRate', 'icMonths'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') calculate();
+      });
+    });
+
+    (async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+    })();
+  </script>
+</body>
+</html>

@@ -294,6 +294,7 @@ input::placeholder { color: var(--border-sub); }
 .tile-icon.budget   { background: transparent; }
 .tile-icon.goals    { background: transparent; }
 .tile-icon.settings { background: transparent; }
+.tile-icon.interest { background: transparent; }
 .tile-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
 .tile-badge {
   font-size: 10px;
