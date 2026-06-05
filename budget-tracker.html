@@ -453,9 +453,11 @@
       const header = document.createElement('div');
       header.className = 'item-row bc-fixed-header';
       header.innerHTML = `
-        <span class="item-name${item.paid ? ' paid' : ''}">${esc(item.name)}</span>
-        <span class="item-amt">${fmt(item.allocatedAmount)}</span>
-        <span class="item-type-badge fixed">${item.paid ? 'Paid' : 'Unpaid'}</span>
+        <div class="bc-item-title">${esc(item.name)}</div>
+        <div class="bc-item-meta">
+          <span class="item-type-badge fixed">${item.paid ? 'Paid' : 'Unpaid'}</span>
+          <span class="item-amt">${fmt(item.allocatedAmount)}</span>
+        </div>
       `;
 
       const body = document.createElement('div');
@@ -486,13 +488,15 @@
       const header = document.createElement('div');
       header.className = 'item-row bc-var-header';
       header.innerHTML = `
-        <span class="item-name">${esc(item.name)}</span>
-        <span class="item-type-badge variable">Variable</span>
-        <div class="bc-var-amounts">
-          <span class="${over ? 'over' : 'expense'}">${fmt(spent)}</span>
-          <span class="bc-sep"> / ${fmt(item.allocatedAmount)}</span>
+        <div class="bc-item-title">${esc(item.name)}</div>
+        <div class="bc-item-meta">
+          <span class="item-type-badge variable">Variable</span>
+          <div class="bc-var-amounts">
+            <span class="${over ? 'over' : 'expense'}">${fmt(spent)}</span>
+            <span class="bc-sep"> / ${fmt(item.allocatedAmount)}</span>
+          </div>
+          <span class="bc-var-remaining${over ? ' over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))} left</span>
         </div>
-        <span class="bc-var-remaining${over ? ' over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
       `;
 
       const body = document.createElement('div');

@@ -2115,9 +2115,9 @@ input::placeholder { color: var(--border-sub); }
   color: var(--border-sub);
   transition: transform .2s ease;
   flex-shrink: 0;
-  margin-left: auto;
+  align-self: flex-start;
   padding-left: 8px;
-  line-height: 1;
+  line-height: 1.6;
   user-select: none;
 }
 .bc-item-card.open .bc-item-chevron { transform: rotate(90deg); }
@@ -2128,15 +2128,36 @@ input::placeholder { color: var(--border-sub); }
   transition: max-height .25s ease;
 }
 
+/* Shared two-row item header layout */
+.bc-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 100%;
+}
+.bc-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* Fixed item header */
 .bc-fixed-header {
   cursor: pointer;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   min-height: auto;
-  padding: 16px 20px;
+  padding: 14px 20px;
 }
 .bc-fixed-header:hover { background: var(--surface-2); }
-.bc-fixed-header .item-name { flex: 1; }
 
 /* Fixed item body */
 .bc-fixed-body {
@@ -2159,24 +2180,15 @@ input::placeholder { color: var(--border-sub); }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  padding: 16px 20px 12px;
+  gap: 4px 12px;
+  padding: 14px 20px;
   cursor: pointer;
   min-height: auto;
 }
 .bc-var-header:hover { background: var(--surface-2); }
-.bc-var-header .item-name {
-  flex: 1;
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bc-var-header .item-type-badge { flex-shrink: 0; }
-.bc-var-amounts { font-size: 13px; color: var(--muted); flex-shrink: 0; }
+.bc-var-amounts { font-size: 12px; color: var(--muted); flex-shrink: 0; }
 .bc-sep { color: var(--border-sub); }
-.bc-var-remaining { font-size: 14px; font-weight: 700; color: var(--income); flex-shrink: 0; }
+.bc-var-remaining { font-size: 12px; font-weight: 700; color: var(--income); flex-shrink: 0; margin-left: auto; }
 .bc-var-remaining.over { color: var(--expense); }
 
 /* Variable item body */
