@@ -2087,6 +2087,56 @@ input::placeholder { color: var(--border-sub); }
 }
 .landing-signout:hover { opacity: 1; }
 
+/* ── Quick budget access ── */
+.quick-budget-btn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  background: var(--bg);
+  border: 2px solid var(--border-sub);
+  border-radius: 0;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  width: 100%;
+  max-width: 460px;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-budget-btn:hover {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+.quick-budget-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.quick-budget-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  text-align: left;
+}
+.quick-budget-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--muted);
+}
+.quick-budget-month {
+  font-size: 16px;
+  font-weight: 700;
+}
+.quick-budget-arrow {
+  color: var(--muted);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
 /* ════════════════════════════════════════════
    NAV ACTIONS
 ════════════════════════════════════════════ */

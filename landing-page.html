@@ -34,6 +34,8 @@
       <p>What would you like to work on today?</p>
     </div>
 
+    <div id="quickBudget" class="hidden"></div>
+
     <div class="apps-row">
       <a class="app-tile" href="finance-plans.html">
         <div class="tile-icon finance"><img src="Icons/Planner.svg" class="svg-icon tile-svg-icon" alt=""></div>
@@ -55,6 +57,7 @@
         <span class="tile-label">Interest<br>Calculator</span>
       </a>
     </div>
+
     <button class="btn btn-ghost btn-sm landing-signout" onclick="State.signOut()">Sign Out</button>
   </div>
 
@@ -62,10 +65,32 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="app.js"></script>
   <script>
+    function monthLabel(key) {
+      const [y, m] = key.split('-');
+      return new Date(+y, +m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    }
+
     (async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
       document.getElementById('userName').textContent = State.getUser();
+
+      const budgets = State.getBudgets();
+      if (budgets.length) {
+        const latest = budgets.slice().sort((a, b) => b.month.localeCompare(a.month))[0];
+        const el = document.getElementById('quickBudget');
+        el.classList.remove('hidden');
+        el.innerHTML = `
+          <a class="quick-budget-btn" href="budget-tracker.html?month=${latest.month}">
+            <div class="quick-budget-icon"><img src="Icons/Tracker.svg" class="svg-icon tile-svg-icon" alt=""></div>
+            <div class="quick-budget-text">
+              <span class="quick-budget-label">Continue budget</span>
+              <span class="quick-budget-month">${monthLabel(latest.month)}</span>
+            </div>
+            <span class="quick-budget-arrow">→</span>
+          </a>
+        `;
+      }
     })();
   </script>
 </body>
