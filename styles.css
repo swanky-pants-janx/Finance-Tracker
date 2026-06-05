@@ -2444,15 +2444,10 @@ input::placeholder { color: var(--border-sub); }
   .stats-cat-sub { padding: 4px 16px 12px; }
   .stats-item-row { padding: 10px 16px; }
 
-  /* Budget tracker — give cards breathing room on narrow screens */
-  .bt-cat-card-wrap {
-    padding-left: 4%;
-    padding-right: 4%;
-  }
-  .bt-mobile-detail {
-    margin-left: 4%;
-    margin-right: 4%;
-  }
+  /* Budget tracker — stretch cards closer to screen edges on mobile */
+  .col-scroll { padding: 6px 6px; }
+  .bt-cat-card-wrap { padding-left: 6px; padding-right: 6px; }
+  .bt-mobile-detail { margin: 0 6px; }
 }
 
 /* Wide desktop extras */
