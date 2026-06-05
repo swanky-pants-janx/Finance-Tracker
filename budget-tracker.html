@@ -415,18 +415,15 @@
       const card = document.createElement('div');
       card.className = 'bc-item-card';
 
-      const chevron = document.createElement('span');
-      chevron.className = 'bc-item-chevron';
-      chevron.textContent = '›';
-      headerEl.appendChild(chevron);
-
       const body = document.createElement('div');
       body.className = 'bc-item-body';
       body.appendChild(bodyEl);
 
+      const chevron = headerEl.querySelector('.bc-item-chevron');
       const setOpen = (open) => {
         card.classList.toggle('open', open);
         body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
+        if (chevron) chevron.style.transform = open ? 'rotate(90deg)' : '';
         if (open) openItemIds.add(itemId); else openItemIds.delete(itemId);
       };
 
@@ -480,16 +477,19 @@
       const pct       = item.allocatedAmount > 0 ? Math.min((spent / item.allocatedAmount) * 100, 100) : 0;
 
       const header = document.createElement('div');
-      header.className = 'item-row bc-var-header';
+      header.className = 'bc-var-header';
       header.innerHTML = `
-        <div class="bc-item-title">${esc(item.name)}</div>
-        <div class="bc-item-meta">
+        <div class="bc-var-row1">
+          <span class="bc-var-title">${esc(item.name)}</span>
+          <span class="bc-var-remaining${over ? ' over' : ''}">${over ? '−' : '+'}${fmt(Math.abs(remaining))}</span>
+          <span class="bc-item-chevron">›</span>
+        </div>
+        <div class="bc-var-row2">
           <span class="item-type-badge variable">Variable</span>
-          <div class="bc-var-amounts">
-            <span class="${over ? 'over' : 'expense'}">${fmt(spent)}</span>
+          <span class="bc-var-amounts">
+            <span class="${over ? 'over' : ''}">${fmt(spent)}</span>
             <span class="bc-sep"> / ${fmt(item.allocatedAmount)}</span>
-          </div>
-          <span class="bc-var-remaining${over ? ' over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))} left</span>
+          </span>
         </div>
       `;
 

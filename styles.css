@@ -2115,38 +2115,14 @@ input::placeholder { color: var(--border-sub); }
   color: var(--border-sub);
   transition: transform .2s ease;
   flex-shrink: 0;
-  align-self: flex-start;
-  padding-left: 8px;
-  line-height: 1.6;
+  line-height: 1;
   user-select: none;
 }
-.bc-item-card.open .bc-item-chevron { transform: rotate(90deg); }
 
 .bc-item-body {
   overflow: hidden;
   max-height: 0;
   transition: max-height .25s ease;
-}
-
-/* Shared two-row item header layout */
-.bc-item-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1 1 100%;
-}
-.bc-item-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  flex: 1 1 100%;
-  font-size: 12px;
-  color: var(--muted);
 }
 
 /* Fixed item header */
@@ -2175,21 +2151,48 @@ input::placeholder { color: var(--border-sub); }
 }
 .item-name.paid { color: var(--border-sub); text-decoration: line-through; }
 
-/* Variable item header */
+/* Variable item header — mirrors category card layout */
 .bc-var-header {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-  padding: 14px 20px;
+  flex-direction: column;
+  padding: 16px 20px 14px;
   cursor: pointer;
-  min-height: auto;
+  gap: 6px;
 }
 .bc-var-header:hover { background: var(--surface-2); }
-.bc-var-amounts { font-size: 12px; color: var(--muted); flex-shrink: 0; }
-.bc-sep { color: var(--border-sub); }
-.bc-var-remaining { font-size: 12px; font-weight: 700; color: var(--income); flex-shrink: 0; margin-left: auto; }
+
+.bc-var-row1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bc-var-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.bc-var-remaining {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--income);
+  flex-shrink: 0;
+}
 .bc-var-remaining.over { color: var(--expense); }
+
+.bc-var-row2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bc-var-amounts { font-size: 12px; color: var(--muted); }
+.bc-sep { color: var(--border-sub); }
 
 /* Variable item body */
 .bc-var-body { border-top: 1px solid var(--border-sub); }
