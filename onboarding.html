@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>flanner — welcome</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-onboarding">
+
+  <div class="onboarding-page">
+
+    <div class="onboarding-page-header">
+      <div class="onboarding-wordmark">flanner</div>
+      <div class="onboarding-tagline">Your complete personal finance toolkit</div>
+    </div>
+
+    <div class="onboarding-page-steps">
+
+      <div class="onboarding-page-step">
+        <div class="onboarding-page-num">1</div>
+        <div class="onboarding-page-icon">
+          <img src="Icons/Planner.svg" class="svg-icon" style="width:28px;height:28px;" alt="">
+        </div>
+        <div class="onboarding-page-content">
+          <div class="onboarding-page-title">Finance Planner</div>
+          <div class="onboarding-page-desc">Start here. Enter your monthly income, create expense categories, and allocate a budget to each one. This plan becomes the blueprint every budget month is built from — set it once, reuse it forever.</div>
+        </div>
+      </div>
+
+      <div class="onboarding-page-step">
+        <div class="onboarding-page-num">2</div>
+        <div class="onboarding-page-icon">
+          <img src="Icons/Tracker.svg" class="svg-icon" style="width:28px;height:28px;" alt="">
+        </div>
+        <div class="onboarding-page-content">
+          <div class="onboarding-page-title">Budget Tracker</div>
+          <div class="onboarding-page-desc">Each month, open the tracker to log what you actually spend. Fixed expenses like rent get checked off when paid. Variable items like groceries let you log individual transactions and see how close you are to your limit in real time.</div>
+        </div>
+      </div>
+
+      <div class="onboarding-page-step">
+        <div class="onboarding-page-num">3</div>
+        <div class="onboarding-page-icon">
+          <img src="Icons/Save.svg" class="svg-icon" style="width:28px;height:28px;" alt="">
+        </div>
+        <div class="onboarding-page-content">
+          <div class="onboarding-page-title">Savings Planner</div>
+          <div class="onboarding-page-desc">Add your savings accounts and set goals. Track how much you've saved, how much is left to reach your target, and project when you'll get there based on your current contribution rate.</div>
+        </div>
+      </div>
+
+      <div class="onboarding-page-step">
+        <div class="onboarding-page-num">4</div>
+        <div class="onboarding-page-icon">
+          <img src="Icons/percentage-svgrepo-com.svg" class="svg-icon" style="width:28px;height:28px;" alt="">
+        </div>
+        <div class="onboarding-page-content">
+          <div class="onboarding-page-title">Interest Calculator</div>
+          <div class="onboarding-page-desc">Enter your credit card or loan balances, interest rates, and monthly repayments to see the true cost of your debt — total interest paid, time to pay off, and how extra payments change the picture.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="onboarding-page-footer">
+      <div class="onboarding-page-tip">💡 The recommended flow: set up your Finance Plan first, then open the Budget Tracker each month to log spending against it.</div>
+      <button class="btn btn-primary onboarding-page-cta" onclick="finish()">Get started →</button>
+    </div>
+
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="app.js"></script>
+  <script>
+    async function finish() {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      const userId = State.getUser();
+      localStorage.setItem(`flanner_onboarded_${userId}`, '1');
+      window.location.href = 'landing-page.html';
+    }
+
+    (async () => {
+      const ok = await State.requireAuth();
+      if (!ok) return;
+      // If already onboarded, skip straight to home
+      const userId = State.getUser();
+      if (localStorage.getItem(`flanner_onboarded_${userId}`)) {
+        window.location.href = 'landing-page.html';
+      }
+    })();
+  </script>
+</body>
+</html>
