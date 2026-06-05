@@ -288,7 +288,7 @@
     }
 
     function copyResult(value, btn) {
-      const text = value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const text = value.toFixed(2);
       navigator.clipboard.writeText(text).then(() => {
         btn.classList.add('copied');
         setTimeout(() => btn.classList.remove('copied'), 1800);
