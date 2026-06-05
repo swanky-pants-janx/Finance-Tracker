@@ -219,17 +219,20 @@ input::placeholder { color: var(--border-sub); }
 
 .apps-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 2px;
+  width: 100%;
   max-width: 460px;
 }
 .app-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 32px 20px;
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+  padding: 20px 8px;
   background: var(--bg);
   border: 2px solid var(--border-sub);
   border-radius: 0;
@@ -259,7 +262,7 @@ input::placeholder { color: var(--border-sub); }
 }
 
 .tile-svg-icon {
-  width: 30px; height: 30px;
+  width: 22px; height: 22px;
   filter: brightness(0) invert(0.85);
 }
 
@@ -282,11 +285,12 @@ input::placeholder { color: var(--border-sub); }
 }
 
 .tile-icon {
-  width: 56px; height: 56px;
+  width: 44px; height: 44px;
   border-radius: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 26px;
+  font-size: 22px;
   border: 2px solid var(--border-sub);
+  flex-shrink: 0;
 }
 .tile-icon.finance  { background: transparent; }
 .tile-icon.savings  { background: transparent; }
@@ -295,7 +299,7 @@ input::placeholder { color: var(--border-sub); }
 .tile-icon.goals    { background: transparent; }
 .tile-icon.settings { background: transparent; }
 .tile-icon.interest { background: transparent; }
-.tile-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+.tile-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; text-align: center; }
 .tile-badge {
   font-size: 10px;
   font-weight: 800;
@@ -2411,10 +2415,10 @@ input::placeholder { color: var(--border-sub); }
     justify-content: center;
     max-width: 560px;
   }
-  .app-tile { padding: 32px 22px; }
+  .app-tile { padding: 32px 22px; gap: 16px; }
   .tile-icon { width: 60px; height: 60px; font-size: 28px; }
   .tile-svg-icon { width: 32px; height: 32px; }
-  .tile-label { font-size: 12px; }
+  .tile-label { font-size: 12px; letter-spacing: .6px; }
 
   .page-finance { height: 100vh; overflow: hidden; }
   .finance-board { overflow: auto; height: calc(100vh - 72px); flex-wrap: nowrap; align-items: stretch; }
