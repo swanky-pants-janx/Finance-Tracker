@@ -434,6 +434,7 @@
       headerEl.addEventListener('click', (e) => {
         // Don't toggle when clicking interactive elements inside the header
         if (e.target.closest('input, button, label')) return;
+        e.stopPropagation();
         const open = card.classList.toggle('open');
         body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
       });
