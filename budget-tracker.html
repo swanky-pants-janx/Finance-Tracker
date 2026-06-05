@@ -300,6 +300,7 @@
       wrap.draggable = true;
       wrap.addEventListener('click', (e) => {
         if (e.target.classList.contains('drag-handle')) return;
+        if (e.target.closest('.bt-mobile-detail')) return;
         selectedCatId = cat.id;
         document.querySelectorAll('.bt-cat-card-wrap').forEach(el => el.classList.remove('active'));
         wrap.classList.add('active');
