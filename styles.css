@@ -2499,13 +2499,6 @@ input::placeholder { color: var(--border-sub); }
   .stats-cat-sub { padding: 4px 16px 12px; }
   .stats-item-row { padding: 10px 16px; }
 
-  /* Ensure bottom nav doesn't overlap content — pad all mobile scroll containers */
-  .page-finance,
-  .page-category,
-  .page-savings,
-  .page-budget,
-  .budget-wrap,
-  .page-hub { padding-bottom: 56px; }
 
   /* Savings planner — title above amount on mobile */
   .sp-goal-card-row { flex-wrap: wrap; }
@@ -2637,6 +2630,24 @@ input::placeholder { color: var(--border-sub); }
   padding-left: 12px;
 }
 .onboarding-page-cta { width: 100%; font-size: 16px; padding: 16px; }
+
+/* ─── Bottom nav spacing — pad real scroll containers so nav doesn't overlap ─── */
+.page-finance,
+.page-category,
+.page-savings,
+.page-budget,
+.page-hub,
+.budget-wrap { padding-bottom: 56px; }
+
+/* On desktop these pages use fixed-height internal layouts, so undo the padding */
+@media (min-width: 768px) {
+  .page-finance,
+  .page-category,
+  .page-savings,
+  .page-budget,
+  .page-hub,
+  .budget-wrap { padding-bottom: 0; }
+}
 
 /* ─── Bottom nav bar ─── */
 .bottom-nav {
