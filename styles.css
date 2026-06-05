@@ -2443,6 +2443,16 @@ input::placeholder { color: var(--border-sub); }
   .stats-cat-top { padding: 16px 16px 0; }
   .stats-cat-sub { padding: 4px 16px 12px; }
   .stats-item-row { padding: 10px 16px; }
+
+  /* Budget tracker — give cards breathing room on narrow screens */
+  .bt-cat-card-wrap {
+    padding-left: 4%;
+    padding-right: 4%;
+  }
+  .bt-mobile-detail {
+    margin-left: 4%;
+    margin-right: 4%;
+  }
 }
 
 /* Wide desktop extras */
