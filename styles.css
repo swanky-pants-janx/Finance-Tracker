@@ -2499,6 +2499,14 @@ input::placeholder { color: var(--border-sub); }
   .stats-cat-sub { padding: 4px 16px 12px; }
   .stats-item-row { padding: 10px 16px; }
 
+  /* Ensure bottom nav doesn't overlap content — pad all mobile scroll containers */
+  .page-finance,
+  .page-category,
+  .page-savings,
+  .page-budget,
+  .budget-wrap,
+  .page-hub { padding-bottom: 56px; }
+
   /* Savings planner — title above amount on mobile */
   .sp-goal-card-row { flex-wrap: wrap; }
   .sp-goal-card-row .card-name { width: 100%; white-space: normal; flex: none; }
