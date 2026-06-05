@@ -1502,8 +1502,31 @@ input::placeholder { color: var(--border-sub); }
 }
 .bt-col:last-child { border-bottom: none; }
 .bt-cats-col  { flex: none; }
-.bt-detail-col { flex: none; overflow-y: visible; }
+.bt-detail-col { flex: none; overflow-y: visible; display: none; } /* hidden on mobile, shown via media query */
 .bt-chart-col  { flex: none; overflow-y: visible; }
+
+/* Desktop slide-in animation for detail panel */
+@keyframes bt-detail-slide {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.bt-detail-col.slide-in { animation: bt-detail-slide .2s ease both; }
+
+/* Mobile inline accordion panel */
+.bt-mobile-detail {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .3s ease;
+  border-left: 3px solid var(--cat-color, var(--border));
+  background: var(--surface-2);
+}
+.bt-mobile-detail.open { max-height: 2000px; }
+.bt-mobile-detail > .items-head {
+  border-bottom: 1px solid var(--border-sub);
+}
+.bt-mobile-detail > .items-scroll {
+  overflow: visible;
+}
 
 .bt-detail-empty {
   display: flex;
@@ -2331,8 +2354,10 @@ input::placeholder { color: var(--border-sub); }
   .bt-col { border-right: 2px solid var(--border); border-bottom: none; }
   .bt-col:last-child { border-right: none; }
   .bt-cats-col   { flex: 1; overflow-y: auto; }
-  .bt-detail-col { flex: 2; overflow-y: auto; }
+  .bt-detail-col { flex: 2; overflow-y: auto; display: flex; } /* restore on desktop */
   .bt-chart-col  { flex: 1; overflow-y: auto; }
+  /* Hide mobile accordions on desktop — detail goes in its own column */
+  .bt-mobile-detail { display: none !important; }
 
   .bc-date-input { width: 150px; }
   .bc-save-btn { width: auto; }

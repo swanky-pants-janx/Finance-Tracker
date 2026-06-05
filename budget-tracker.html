@@ -235,7 +235,9 @@
       wrap.appendChild(board);
 
       renderCategoryCards(currentBudget, document.getElementById('catsScroll'));
-      renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
+      if (!isMobile()) {
+        renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
+      }
       renderChart(currentBudget);
     }
 
@@ -291,10 +293,13 @@
       wrap.addEventListener('click', (e) => {
         if (e.target.classList.contains('drag-handle')) return;
         selectedCatId = cat.id;
-        // Update active state on cards without full re-render
         document.querySelectorAll('.bt-cat-card-wrap').forEach(el => el.classList.remove('active'));
         wrap.classList.add('active');
-        renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
+        if (isMobile()) {
+          openMobileDetail(cat, currentBudget, wrap);
+        } else {
+          renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
+        }
       });
 
       // Drag & drop to reorder categories
@@ -330,20 +335,13 @@
     }
 
     /* ─── Category detail panel ─── */
-    function renderCatDetail(budget, container) {
-      container.innerHTML = '';
-      const cat = budget.categories.find(c => c.id === selectedCatId);
+    const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
 
-      if (!cat) {
-        container.innerHTML = `<div class="bt-detail-empty"><div class="empty-items-icon">👈</div><div>Select a category</div></div>`;
-        return;
-      }
-
+    function buildCatDetailContent(cat, budget) {
       const spent = catSpent(cat);
       const alloc = catAllocated(cat);
       const over  = spent > alloc;
 
-      // Header
       const head = document.createElement('div');
       head.className = 'items-head';
       head.innerHTML = `
@@ -355,7 +353,6 @@
         </div>
       `;
 
-      // Items scroll
       const scroll = document.createElement('div');
       scroll.className = 'items-scroll';
 
@@ -369,7 +366,55 @@
         });
       }
 
+      return [head, scroll];
+    }
+
+    function renderCatDetail(budget, container) {
+      container.innerHTML = '';
+      const cat = budget.categories.find(c => c.id === selectedCatId);
+
+      if (!cat) {
+        container.innerHTML = `<div class="bt-detail-empty"><div class="empty-items-icon">👈</div><div>Select a category</div></div>`;
+        return;
+      }
+
+      const [head, scroll] = buildCatDetailContent(cat, budget);
       container.append(head, scroll);
+
+      // Slide-in animation
+      container.classList.remove('slide-in');
+      void container.offsetWidth; // force reflow to restart animation
+      container.classList.add('slide-in');
+    }
+
+    function openMobileDetail(cat, budget, wrap) {
+      // Remove any other open mobile detail panels
+      document.querySelectorAll('.bt-mobile-detail').forEach(el => {
+        el.classList.remove('open');
+        // Remove after transition
+        el.addEventListener('transitionend', () => el.remove(), { once: true });
+      });
+
+      // If this wrap already has an open panel, just collapsed it (toggle off)
+      const existing = wrap.querySelector('.bt-mobile-detail');
+      if (existing) {
+        existing.classList.remove('open');
+        existing.addEventListener('transitionend', () => existing.remove(), { once: true });
+        return;
+      }
+
+      const panel = document.createElement('div');
+      panel.className = 'bt-mobile-detail';
+      panel.style.setProperty('--cat-color', wrap.style.getPropertyValue('--cat-color'));
+
+      const [head, scroll] = buildCatDetailContent(cat, budget);
+      panel.append(head, scroll);
+
+      // Insert after the barWrap (last child of wrap before any panel)
+      wrap.appendChild(panel);
+
+      // Trigger open on next frame so transition fires
+      requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
     }
 
     /* ─── Fixed item ─── */
