@@ -2503,6 +2503,27 @@ input::placeholder { color: var(--border-sub); }
   .col-scroll { padding: 6px 6px; }
   .bt-cat-card-wrap { padding-left: 6px; padding-right: 6px; }
   .bt-mobile-detail { margin: 0 6px; }
+
+  /* Budget tracker — chart floats to top on mobile, compact height so cats peek below */
+  .bt-chart-col {
+    order: -1;
+    border-bottom: 2px solid var(--border);
+    max-height: 72vh;
+  }
+  .bt-chart-col .summary-top {
+    padding: 16px 20px;
+  }
+  .bt-chart-col .remaining-amt {
+    font-size: 32px;
+  }
+  .bt-chart-col .summary-bottom {
+    padding: 10px 16px 12px;
+  }
+  #btChartBox {
+    max-width: 220px;
+    margin: 0 auto;
+  }
+  .bt-cats-col { order: 0; }
 }
 
 /* Wide desktop extras */
