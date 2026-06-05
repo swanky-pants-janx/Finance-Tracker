@@ -2504,6 +2504,25 @@ input::placeholder { color: var(--border-sub); }
   .bt-cat-card-wrap { padding-left: 6px; padding-right: 6px; }
   .bt-mobile-detail { margin: 0 6px; }
 
+  /* Budget tracker add-spend form: amount and note on separate lines */
+  .bc-add-row { flex-direction: column; align-items: stretch; }
+  .bc-amt-input { width: 100%; min-width: unset; }
+  .bc-note-input { width: 100%; }
+
+  /* Category page item form: R/% toggle + amount share one line; Fixed/Variable centered */
+  .add-item-form {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .add-name-input       { width: 100%; flex: none; }
+  .add-amt-input        { flex: 1; min-width: 0; width: auto; }
+  .pct-toggle           { flex-shrink: 0; }
+  .pct-of-label         { flex-shrink: 0; }
+  .ref-select           { flex: 1; min-width: 0; }
+  .add-item-form > .btn-primary { width: 100%; flex: none; }
+  .budget-type-toggle   { width: 100%; flex: none; justify-content: center; }
+
   /* Budget tracker — chart floats to top on mobile, compact height so cats peek below */
   .bt-chart-col {
     order: -1;
