@@ -72,6 +72,8 @@
     let currentBudget = null;
     let selectedCatId = null;
     let catDragId = null;
+    let mobileCatOpen = false;   // whether the mobile accordion is currently expanded
+    let openItemIds = new Set(); // item IDs whose dropdowns are open
 
     /* ─── Helpers ─── */
     function monthLabel(key) {
@@ -237,6 +239,11 @@
       renderCategoryCards(currentBudget, document.getElementById('catsScroll'));
       if (!isMobile()) {
         renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
+      } else if (mobileCatOpen && selectedCatId) {
+        // Restore the mobile accordion after DOM rebuild
+        const cat = currentBudget.categories.find(c => c.id === selectedCatId);
+        const wrap = document.querySelector(`.bt-cat-card-wrap[data-cat-id="${selectedCatId}"]`);
+        if (cat && wrap) openMobileDetail(cat, currentBudget, wrap, true);
       }
       renderChart(currentBudget);
     }
@@ -264,6 +271,7 @@
 
       const wrap = document.createElement('div');
       wrap.className = 'bt-cat-card-wrap' + (isActive ? ' active' : '');
+      wrap.dataset.catId = cat.id;
       wrap.style.setProperty('--cat-color', color);
       wrap.style.cursor = 'pointer';
 
@@ -387,21 +395,22 @@
       container.classList.add('slide-in');
     }
 
-    function openMobileDetail(cat, budget, wrap) {
+    function openMobileDetail(cat, budget, wrap, skipToggle = false) {
       // Remove any other open mobile detail panels
       document.querySelectorAll('.bt-mobile-detail').forEach(el => {
         el.classList.remove('open');
-        // Remove after transition
         el.addEventListener('transitionend', () => el.remove(), { once: true });
       });
 
-      // If this wrap already has an open panel, just collapsed it (toggle off)
+      // If this wrap already has an open panel, collapse it (toggle off)
       const existing = wrap.querySelector('.bt-mobile-detail');
-      if (existing) {
+      if (existing && !skipToggle) {
         existing.classList.remove('open');
         existing.addEventListener('transitionend', () => existing.remove(), { once: true });
+        mobileCatOpen = false;
         return;
       }
+      mobileCatOpen = true;
 
       const panel = document.createElement('div');
       panel.className = 'bt-mobile-detail';
@@ -418,7 +427,7 @@
     }
 
     /* ─── Item dropdown wrapper ─── */
-    function makeItemCard(headerEl, bodyEl) {
+    function makeItemCard(headerEl, bodyEl, itemId) {
       const card = document.createElement('div');
       card.className = 'bc-item-card';
 
@@ -431,20 +440,30 @@
       body.className = 'bc-item-body';
       body.appendChild(bodyEl);
 
+      const setOpen = (open) => {
+        card.classList.toggle('open', open);
+        body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
+        if (open) openItemIds.add(itemId); else openItemIds.delete(itemId);
+      };
+
       headerEl.addEventListener('click', (e) => {
-        // Don't toggle when clicking interactive elements inside the header
         if (e.target.closest('input, button, label')) return;
         e.stopPropagation();
-        const open = card.classList.toggle('open');
-        body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
+        setOpen(!card.classList.contains('open'));
       });
 
-      // Keep max-height in sync after transitions (e.g. if content changes)
+      // Keep max-height in sync after content changes (e.g. new transaction added)
       body.addEventListener('transitionend', () => {
         if (card.classList.contains('open')) body.style.maxHeight = body.scrollHeight + 'px';
       });
 
       card.append(headerEl, body);
+
+      // Restore open state after a re-render
+      if (openItemIds.has(itemId)) {
+        requestAnimationFrame(() => setOpen(true));
+      }
+
       return card;
     }
 
@@ -475,7 +494,7 @@
         renderPage();
       });
 
-      return makeItemCard(header, body);
+      return makeItemCard(header, body, item.id);
     }
 
     /* ─── Variable item ─── */
@@ -520,7 +539,7 @@
       txnSection.append(addFormEl, listEl);
       body.append(bar, txnSection);
 
-      return makeItemCard(header, body);
+      return makeItemCard(header, body, item.id);
     }
 
     function renderAddForm(item, budget, container) {
