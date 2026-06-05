@@ -699,6 +699,12 @@
       if (!ok) return;
       State.initSync(renderPage);
       renderPage();
+
+      let _resizeTimer;
+      window.addEventListener('resize', () => {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(() => { if (summaryChart) summaryChart.resize(); }, 50);
+      });
     });
   </script>
 </body>

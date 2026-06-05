@@ -774,6 +774,15 @@
         await State.flush();
         window.location.href = 'finance-app.html';
       });
+
+      let _resizeTimer;
+      window.addEventListener('resize', () => {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(() => {
+          if (catChart) catChart.resize();
+          if (overallChart) overallChart.resize();
+        }, 50);
+      });
     });
   </script>
 </body>
