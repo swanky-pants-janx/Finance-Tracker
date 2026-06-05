@@ -3,7 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FinTrack — Category</title>
+  <meta name="description" content="flanner — plan your finances, track your budget, and grow your savings.">
+  <meta name="theme-color" content="#000000">
+
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="flanner">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="social-banner.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="social-banner.svg">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  <meta property="og:title" content="flanner — category">
+  <meta name="twitter:title" content="flanner — category">
+  <title>flanner — category</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="page-category">
@@ -182,7 +201,7 @@
 
       // Nav
       document.getElementById('navTitle').textContent = category.name;
-      document.title = `FinTrack — ${category.name}`;
+      document.title = `flanner — ${category.name}`;
       const tag = document.getElementById('navTag');
       tag.textContent = type === 'income' ? 'Income' : 'Expense';
       tag.className = 'nav-tag ' + type;
