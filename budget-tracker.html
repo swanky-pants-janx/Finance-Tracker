@@ -417,32 +417,66 @@
       requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
     }
 
+    /* ─── Item dropdown wrapper ─── */
+    function makeItemCard(headerEl, bodyEl) {
+      const card = document.createElement('div');
+      card.className = 'bc-item-card';
+
+      const chevron = document.createElement('span');
+      chevron.className = 'bc-item-chevron';
+      chevron.textContent = '›';
+      headerEl.appendChild(chevron);
+
+      const body = document.createElement('div');
+      body.className = 'bc-item-body';
+      body.appendChild(bodyEl);
+
+      headerEl.addEventListener('click', (e) => {
+        // Don't toggle when clicking interactive elements inside the header
+        if (e.target.closest('input, button, label')) return;
+        const open = card.classList.toggle('open');
+        body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
+      });
+
+      // Keep max-height in sync after transitions (e.g. if content changes)
+      body.addEventListener('transitionend', () => {
+        if (card.classList.contains('open')) body.style.maxHeight = body.scrollHeight + 'px';
+      });
+
+      card.append(headerEl, body);
+      return card;
+    }
+
     /* ─── Fixed item ─── */
     function makeFixedRow(item, cat, budget) {
-      const row = document.createElement('div');
-      row.className = 'item-row bc-fixed-row';
-      row.innerHTML = `
+      const header = document.createElement('div');
+      header.className = 'item-row bc-fixed-header';
+      header.innerHTML = `
+        <span class="item-name${item.paid ? ' paid' : ''}">${esc(item.name)}</span>
+        <span class="item-amt">${fmt(item.allocatedAmount)}</span>
+        <span class="item-type-badge fixed">${item.paid ? 'Paid' : 'Unpaid'}</span>
+      `;
+
+      const body = document.createElement('div');
+      body.className = 'bc-fixed-body';
+      body.innerHTML = `
         <label class="bc-fixed-label">
           <input type="checkbox" class="bt-checkbox" ${item.paid ? 'checked' : ''}>
-          <span class="item-name${item.paid ? ' paid' : ''}">${esc(item.name)}</span>
+          <span>Mark as paid</span>
         </label>
-        <span class="item-amt">${fmt(item.allocatedAmount)}</span>
-        <span class="item-type-badge fixed">Fixed</span>
       `;
-      const cb = row.querySelector('.bt-checkbox');
+      const cb = body.querySelector('.bt-checkbox');
       cb.addEventListener('change', () => {
         item.paid = cb.checked;
         State.saveBudget(budget);
         renderPage();
       });
-      return row;
+
+      return makeItemCard(header, body);
     }
 
     /* ─── Variable item ─── */
     function makeVariableSection(item, cat, budget) {
-      const wrap = document.createElement('div');
-      wrap.className = 'bc-var-section';
-
       const spent     = item.transactions.reduce((s, t) => s + t.amount, 0);
       const remaining = item.allocatedAmount - spent;
       const over      = remaining < 0;
@@ -460,6 +494,9 @@
         <span class="bc-var-remaining${over ? ' over' : ''}">${over ? '−' : ''}${fmt(Math.abs(remaining))}</span>
       `;
 
+      const body = document.createElement('div');
+      body.className = 'bc-var-body';
+
       const bar = document.createElement('div');
       bar.className = 'bt-bar-track bc-var-bar';
       bar.innerHTML = `<div class="bt-bar-fill${over ? ' over' : ''}" style="width:${pct}%"></div>`;
@@ -476,8 +513,9 @@
       renderTxnList(item, budget, listEl);
 
       txnSection.append(addFormEl, listEl);
-      wrap.append(header, bar, txnSection);
-      return wrap;
+      body.append(bar, txnSection);
+
+      return makeItemCard(header, body);
     }
 
     function renderAddForm(item, budget, container) {
