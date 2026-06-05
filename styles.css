@@ -1581,12 +1581,13 @@ input::placeholder { color: var(--border-sub); }
 .bt-checkbox:checked::after {
   content: '';
   position: absolute;
-  left: 5px; top: 2px;
-  width: 7px; height: 11px;
+  left: 50%;
+  top: 46%;
+  width: 6px; height: 11px;
   border: 2.5px solid #000;
   border-top: none;
   border-left: none;
-  transform: rotate(45deg);
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 .bt-item-name { font-size: 15px; font-weight: 500; flex: 1; }
 .bt-item-name.paid { color: var(--border-sub); text-decoration: line-through; }
