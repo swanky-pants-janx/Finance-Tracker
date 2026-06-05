@@ -61,6 +61,53 @@
     <button class="btn btn-ghost btn-sm landing-signout" onclick="State.signOut()">Sign Out</button>
   </div>
 
+  <!-- Onboarding modal (shown once for new users) -->
+  <div class="modal-backdrop onboarding-backdrop hidden" id="onboardingBackdrop"></div>
+  <div class="modal onboarding-modal hidden" id="onboardingModal" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+    <div class="modal-header">
+      <span class="modal-title" id="onboardingTitle">How flanner works</span>
+      <button class="modal-close" onclick="closeOnboarding()" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body onboarding-body">
+      <div class="onboarding-steps">
+
+        <div class="onboarding-step">
+          <div class="onboarding-step-num">1</div>
+          <div class="onboarding-step-content">
+            <div class="onboarding-step-title">Finance Planner</div>
+            <div class="onboarding-step-desc">Start here. Enter your income, create expense categories, and allocate funds to each one. This becomes the blueprint every budget month is built from.</div>
+          </div>
+        </div>
+
+        <div class="onboarding-step">
+          <div class="onboarding-step-num">2</div>
+          <div class="onboarding-step-content">
+            <div class="onboarding-step-title">Budget Tracker</div>
+            <div class="onboarding-step-desc">Each month, open the tracker to log what you actually spend. Fixed items get checked off when paid; variable items let you add individual transactions and see how close you are to your limit.</div>
+          </div>
+        </div>
+
+        <div class="onboarding-step">
+          <div class="onboarding-step-num">3</div>
+          <div class="onboarding-step-content">
+            <div class="onboarding-step-title">Savings Planner</div>
+            <div class="onboarding-step-desc">Add your savings accounts and set goals. Track how much you've saved, what's left to reach your target, and when you'll get there at your current pace.</div>
+          </div>
+        </div>
+
+        <div class="onboarding-step">
+          <div class="onboarding-step-num">4</div>
+          <div class="onboarding-step-content">
+            <div class="onboarding-step-title">Interest Calculator</div>
+            <div class="onboarding-step-desc">Enter your credit card or loan balances, interest rates, and monthly repayments to see the true cost of your debt — total interest paid and time to pay it off.</div>
+          </div>
+        </div>
+
+      </div>
+      <button class="btn btn-primary onboarding-cta" onclick="closeOnboarding()">Got it — let's go</button>
+    </div>
+  </div>
+
   <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="app.js"></script>
@@ -70,10 +117,24 @@
       return new Date(+y, +m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
     }
 
+    function closeOnboarding() {
+      document.getElementById('onboardingModal').classList.add('hidden');
+      document.getElementById('onboardingBackdrop').classList.add('hidden');
+    }
+
     (async () => {
       const ok = await State.requireAuth();
       if (!ok) return;
-      document.getElementById('userName').textContent = State.getUser();
+      const userId = State.getUser();
+      document.getElementById('userName').textContent = userId;
+
+      // Show onboarding once per user
+      const seenKey = `flanner_onboarded_${userId}`;
+      if (!localStorage.getItem(seenKey)) {
+        localStorage.setItem(seenKey, '1');
+        document.getElementById('onboardingModal').classList.remove('hidden');
+        document.getElementById('onboardingBackdrop').classList.remove('hidden');
+      }
 
       const budgets = State.getBudgets();
       if (budgets.length) {
