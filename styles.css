@@ -2631,22 +2631,13 @@ input::placeholder { color: var(--border-sub); }
 }
 .onboarding-page-cta { width: 100%; font-size: 16px; padding: 16px; }
 
-/* ─── Bottom nav spacing — pad real scroll containers so nav doesn't overlap ─── */
-.page-finance,
-.page-category,
-.page-savings,
-.page-budget,
-.page-hub,
-.budget-wrap { padding-bottom: 56px; }
-
-/* On desktop these pages use fixed-height internal layouts, so undo the padding */
+/* ─── Bottom nav spacer — physically pushes content above the fixed nav ─── */
+.bottom-nav-spacer {
+  height: 56px;
+  flex-shrink: 0;
+}
 @media (min-width: 768px) {
-  .page-finance,
-  .page-category,
-  .page-savings,
-  .page-budget,
-  .page-hub,
-  .budget-wrap { padding-bottom: 0; }
+  .bottom-nav-spacer { display: none; }
 }
 
 /* ─── Bottom nav bar ─── */
@@ -2683,7 +2674,4 @@ input::placeholder { color: var(--border-sub); }
   filter: brightness(0) saturate(100%) invert(48%) sepia(80%) saturate(600%) hue-rotate(190deg);
 }
 
-/* Offset page content so it's not hidden behind the nav */
-body { padding-bottom: 56px; }
-.page-landing body, body.page-landing,
-body.page-signin { padding-bottom: 0; }
+
