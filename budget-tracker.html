@@ -347,21 +347,6 @@
     const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
 
     function buildCatDetailContent(cat, budget) {
-      const spent = catSpent(cat);
-      const alloc = catAllocated(cat);
-      const over  = spent > alloc;
-
-      const head = document.createElement('div');
-      head.className = 'items-head';
-      head.innerHTML = `
-        <span class="items-head-title">${esc(cat.name)}</span>
-        <div class="bc-head-stats">
-          <span class="bc-spent-val${over ? ' over' : ' expense'}">${fmt(spent)}</span>
-          <span class="bc-head-sep"> / </span>
-          <span class="bc-alloc-val">${fmt(alloc)}</span>
-        </div>
-      `;
-
       const scroll = document.createElement('div');
       scroll.className = 'items-scroll';
 
@@ -375,7 +360,7 @@
         });
       }
 
-      return [head, scroll];
+      return scroll;
     }
 
     function renderCatDetail(budget, container) {
@@ -387,8 +372,7 @@
         return;
       }
 
-      const [head, scroll] = buildCatDetailContent(cat, budget);
-      container.append(head, scroll);
+      container.append(buildCatDetailContent(cat, budget));
 
       // Slide-in animation
       container.classList.remove('slide-in');
@@ -417,8 +401,7 @@
       panel.className = 'bt-mobile-detail';
       panel.style.setProperty('--cat-color', wrap.style.getPropertyValue('--cat-color'));
 
-      const [head, scroll] = buildCatDetailContent(cat, budget);
-      panel.append(head, scroll);
+      panel.append(buildCatDetailContent(cat, budget));
 
       // Insert after the barWrap (last child of wrap before any panel)
       wrap.appendChild(panel);
@@ -468,34 +451,25 @@
       return card;
     }
 
-    /* ─── Fixed item ─── */
+    /* ─── Fixed item (flat row, no dropdown) ─── */
     function makeFixedRow(item, cat, budget) {
-      const header = document.createElement('div');
-      header.className = 'item-row bc-fixed-header';
-      header.innerHTML = `
-        <div class="bc-item-title">${esc(item.name)}</div>
-        <div class="bc-item-meta">
-          <span class="item-type-badge fixed">${item.paid ? 'Paid' : 'Unpaid'}</span>
-          <span class="item-amt">${fmt(item.allocatedAmount)}</span>
-        </div>
-      `;
-
-      const body = document.createElement('div');
-      body.className = 'bc-fixed-body';
-      body.innerHTML = `
+      const row = document.createElement('div');
+      row.className = 'item-row bc-fixed-row';
+      row.innerHTML = `
         <label class="bc-fixed-label">
           <input type="checkbox" class="bt-checkbox" ${item.paid ? 'checked' : ''}>
-          <span>Mark as paid</span>
+          <span class="item-name${item.paid ? ' paid' : ''}">${esc(item.name)}</span>
         </label>
+        <span class="item-type-badge fixed">${item.paid ? 'Paid' : 'Unpaid'}</span>
+        <span class="item-amt">${fmt(item.allocatedAmount)}</span>
       `;
-      const cb = body.querySelector('.bt-checkbox');
-      cb.addEventListener('change', () => {
-        item.paid = cb.checked;
+      row.querySelector('.bt-checkbox').addEventListener('change', (e) => {
+        e.stopPropagation();
+        item.paid = e.target.checked;
         State.saveBudget(budget);
         renderPage();
       });
-
-      return makeItemCard(header, body, item.id);
+      return row;
     }
 
     /* ─── Variable item ─── */
