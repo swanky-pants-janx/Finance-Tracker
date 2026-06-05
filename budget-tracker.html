@@ -71,6 +71,7 @@
 
     let currentBudget = null;
     let selectedCatId = null;
+    let catDragId = null;
 
     /* ─── Helpers ─── */
     function monthLabel(key) {
@@ -267,6 +268,7 @@
       const card = document.createElement('div');
       card.className = 'bt-cat-nav-card';
       card.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
         <span class="card-name">${esc(cat.name)}</span>
         <span class="card-amt${over ? ' over' : ''}">${over ? '−' : '+'}${fmt(Math.abs(remaining))}</span>
         <span class="bt-cat-nav-arrow">›</span>
@@ -285,13 +287,45 @@
       `;
 
       wrap.append(card, barWrap);
-      wrap.addEventListener('click', () => {
+      wrap.draggable = true;
+      wrap.addEventListener('click', (e) => {
+        if (e.target.classList.contains('drag-handle')) return;
         selectedCatId = cat.id;
         // Update active state on cards without full re-render
         document.querySelectorAll('.bt-cat-card-wrap').forEach(el => el.classList.remove('active'));
         wrap.classList.add('active');
         renderCatDetail(currentBudget, document.getElementById('btDetailCol'));
       });
+
+      // Drag & drop to reorder categories
+      wrap.addEventListener('dragstart', (e) => {
+        catDragId = cat.id;
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => wrap.classList.add('dragging'));
+      });
+      wrap.addEventListener('dragend', () => {
+        wrap.classList.remove('dragging');
+        document.querySelectorAll('.bt-cat-card-wrap.drag-over').forEach(x => x.classList.remove('drag-over'));
+        catDragId = null;
+      });
+      wrap.addEventListener('dragover', e => e.preventDefault());
+      wrap.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        if (catDragId && catDragId !== cat.id) wrap.classList.add('drag-over');
+      });
+      wrap.addEventListener('dragleave', () => wrap.classList.remove('drag-over'));
+      wrap.addEventListener('drop', (e) => {
+        e.preventDefault();
+        wrap.classList.remove('drag-over');
+        if (!catDragId || catDragId === cat.id) return;
+        const si = currentBudget.categories.findIndex(c => c.id === catDragId);
+        const ti = currentBudget.categories.findIndex(c => c.id === cat.id);
+        const [moved] = currentBudget.categories.splice(si, 1);
+        currentBudget.categories.splice(ti, 0, moved);
+        State.saveBudget(currentBudget);
+        renderPage();
+      });
+
       return wrap;
     }
 

@@ -1395,7 +1395,10 @@ input::placeholder { color: var(--border-sub); }
   flex-direction: column;
   padding: 12px 16px 0;
   gap: 0;
+  position: relative;
 }
+.bt-cat-card-wrap.dragging { opacity: .3; }
+.bt-cat-card-wrap.drag-over .bt-cat-nav-card { border-color: var(--border); background: var(--surface-2); }
 .bt-cat-card-wrap:last-child { padding-bottom: 12px; }
 
 .bt-cat-nav-card {
@@ -2164,6 +2167,8 @@ input::placeholder { color: var(--border-sub); }
 
   .drag-handle { display: flex; }
   .cat-card:hover .drag-handle { opacity: 1; }
+  .item-row:hover .drag-handle { opacity: 1; }
+  .bt-cat-card-wrap:hover .drag-handle { opacity: 1; }
 
   .card-del,
   .card-toggle,
