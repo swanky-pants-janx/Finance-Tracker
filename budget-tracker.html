@@ -32,15 +32,11 @@
     <button class="nav-back" onclick="State.flush().then(()=>window.location.href='budget-hub.html')">← Back</button>
     <span class="nav-title" id="navTitle">Budget Tracker</span>
     <div class="nav-actions">
-      <button class="btn btn-ghost view-toggle-btn hidden" id="statsBtn" onclick="toggleStats()">Stats</button>
       <button class="btn btn-ghost view-toggle-btn hidden" id="viewToggleBtn" onclick="toggleView()">Table View</button>
     </div>
   </nav>
 
   <div class="budget-wrap" id="budgetWrap"></div>
-
-  <!-- Stats view (hidden by default) -->
-  <div class="stats-view hidden" id="statsView"></div>
 
   <!-- Table view (hidden by default) -->
   <div class="table-view hidden" id="tableView">
@@ -193,7 +189,6 @@
       State.saveBudget(currentBudget);
 
       document.getElementById('viewToggleBtn').classList.remove('hidden');
-      document.getElementById('statsBtn').classList.remove('hidden');
 
       // Validate selectedCatId still exists
       if (selectedCatId && !currentBudget.categories.find(c => c.id === selectedCatId)) {
@@ -557,101 +552,24 @@
     }
 
     /* ─── View switching ─── */
-    let activeView = 'board'; // 'board' | 'table' | 'stats'
-
-    function showBoard() {
-      document.getElementById('budgetWrap').classList.remove('hidden');
-      document.getElementById('tableView').classList.add('hidden');
-      document.getElementById('statsView').classList.add('hidden');
-      document.getElementById('viewToggleBtn').textContent = 'Table View';
-      document.getElementById('statsBtn').textContent = 'Stats';
-    }
+    /* ─── Table view ─── */
+    let tableViewActive = false;
 
     function toggleView() {
-      if (activeView !== 'table') {
-        activeView = 'table';
-        document.getElementById('budgetWrap').classList.add('hidden');
-        document.getElementById('statsView').classList.add('hidden');
-        document.getElementById('tableView').classList.remove('hidden');
+      tableViewActive = !tableViewActive;
+      const btn   = document.getElementById('viewToggleBtn');
+      const board = document.getElementById('budgetWrap');
+      const table = document.getElementById('tableView');
+      if (tableViewActive) {
+        board.classList.add('hidden');
+        table.classList.remove('hidden');
         buildTableView();
-        document.getElementById('viewToggleBtn').textContent = 'Board View';
-        document.getElementById('statsBtn').textContent = 'Stats';
+        btn.textContent = 'Board View';
       } else {
-        activeView = 'board';
-        showBoard();
+        board.classList.remove('hidden');
+        table.classList.add('hidden');
+        btn.textContent = 'Table View';
       }
-    }
-
-    function toggleStats() {
-      if (activeView !== 'stats') {
-        activeView = 'stats';
-        document.getElementById('budgetWrap').classList.add('hidden');
-        document.getElementById('tableView').classList.add('hidden');
-        document.getElementById('statsView').classList.remove('hidden');
-        buildStatsView();
-        document.getElementById('statsBtn').textContent = 'Board View';
-        document.getElementById('viewToggleBtn').textContent = 'Table View';
-      } else {
-        activeView = 'board';
-        showBoard();
-      }
-    }
-
-    /* ─── Stats view ─── */
-    function buildStatsView() {
-      if (!currentBudget) return;
-      const el = document.getElementById('statsView');
-      el.innerHTML = '';
-
-      const totalAnnual = currentBudget.categories.reduce((s, cat) =>
-        s + cat.items.reduce((cs, item) => cs + item.allocatedAmount, 0), 0) * 12;
-
-      const header = document.createElement('div');
-      header.className = 'stats-header';
-      header.innerHTML = `
-        <div class="stats-header-label">Annual Spend Projection</div>
-        <div class="stats-header-total">${fmt(totalAnnual)}</div>
-        <div class="stats-header-sub">Based on ${monthLabel(currentBudget.month)} monthly allocations × 12</div>
-      `;
-      el.appendChild(header);
-
-      const grid = document.createElement('div');
-      grid.className = 'stats-grid';
-
-      currentBudget.categories.forEach(cat => {
-        const catMonthly = cat.items.reduce((s, i) => s + i.allocatedAmount, 0);
-        const catAnnual  = catMonthly * 12;
-
-        const catCard = document.createElement('div');
-        catCard.className = 'stats-cat-card';
-        catCard.innerHTML = `
-          <div class="stats-cat-top">
-            <span class="stats-cat-name">${esc(cat.name)}</span>
-            <span class="stats-cat-amt">${fmt(catAnnual)}</span>
-          </div>
-          <div class="stats-cat-sub">${fmt(catMonthly)} / mo</div>
-        `;
-
-        if (cat.items.length > 0) {
-          const items = document.createElement('div');
-          items.className = 'stats-items';
-          cat.items.forEach(item => {
-            const itemAnnual = item.allocatedAmount * 12;
-            const itemEl = document.createElement('div');
-            itemEl.className = 'stats-item-row';
-            itemEl.innerHTML = `
-              <span class="stats-item-name">${esc(item.name)}</span>
-              <span class="stats-item-amt">${fmt(itemAnnual)}</span>
-            `;
-            items.appendChild(itemEl);
-          });
-          catCard.appendChild(items);
-        }
-
-        grid.appendChild(catCard);
-      });
-
-      el.appendChild(grid);
     }
 
     function buildTableView() {
