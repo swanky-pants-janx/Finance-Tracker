@@ -29,7 +29,7 @@
 <body class="page-finance">
   <!-- ── Top nav ── -->
   <nav class="top-nav">
-    <button class="nav-back" onclick="State.flush().then(()=>window.location.href='finance-plans.html')">←</button>
+    <button class="nav-back" aria-label="Back" onclick="State.flush().then(()=>window.location.href='finance-plans.html')">←</button>
     <span class="nav-title"></span>
     <div class="nav-actions">
       <button class="btn btn-ghost view-toggle-btn" id="statsBtn" onclick="toggleStats()">Stats</button>
@@ -102,6 +102,7 @@
         <tbody id="financeTableBody"></tbody>
       </table>
     </div>
+  </div>
 
   <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>

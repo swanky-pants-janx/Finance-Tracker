@@ -28,7 +28,7 @@
 </head>
 <body class="page-budget">
   <nav class="top-nav">
-    <button class="nav-back" onclick="State.flush().then(()=>window.location.href='budget-hub.html')">←</button>
+    <button class="nav-back" aria-label="Back" onclick="State.flush().then(()=>window.location.href='budget-hub.html')">←</button>
     <span class="nav-title" id="navTitle">Budget Tracker</span>
     <div class="nav-actions">
       <button class="btn btn-ghost view-toggle-btn hidden" id="viewToggleBtn" onclick="toggleView()">Table View</button>
@@ -58,6 +58,7 @@
         <tbody id="budgetTableBody"></tbody>
       </table>
     </div>
+  </div>
 
   <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>

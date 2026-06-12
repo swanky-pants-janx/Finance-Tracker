@@ -21,6 +21,7 @@
   --income-bg:    rgba(34,197,94,0.08);
   --expense:      #ef4444;
   --expense-bg:   rgba(239,68,68,0.08);
+  --warn:         #f0a541;
   --blue:         #3b82f6;
   --blue-bg:      rgba(59,130,246,0.08);
   --r:            0px;
@@ -41,6 +42,30 @@ html, body {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-sub); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Inverted text selection — white on black flips to black on white */
+::selection { background: var(--text); color: var(--bg); }
+
+/* Keyboard focus — crisp white ring, offset so 0-radius borders stay readable */
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+input:focus-visible, .ref-select:focus-visible { outline: none; }
+
+/* Cross-page fade (browsers without View Transitions ignore this) */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation-duration: .12s; }
+::view-transition-new(root) { animation-duration: .12s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
 
 .hidden { display: none !important; }
 
@@ -84,7 +109,7 @@ input::placeholder { color: var(--border-sub); }
   letter-spacing: .03em;
 }
 .btn-primary { background: #ffffff; color: #000000; border-color: #ffffff; }
-.btn-primary:hover { background: var(--muted); border-color: var(--muted); color: #000; }
+.btn-primary:hover { background: #000000; border-color: #ffffff; color: #ffffff; }
 .btn-primary:active { transform: scale(.98); }
 .btn-ghost { background: transparent; color: var(--muted); border: 2px solid var(--border-sub); }
 .btn-ghost:hover { border-color: var(--border); color: var(--text); }
@@ -239,15 +264,21 @@ input::placeholder { color: var(--border-sub); }
   text-decoration: none;
   color: var(--text);
   cursor: pointer;
-  transition: border-color .15s, background .15s;
+  transition: border-color .15s, background .15s, transform .1s;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+.app-tile .tile-label,
+.app-tile .tile-icon,
+.app-tile .tile-svg-icon { transition: color .15s, border-color .15s, filter .15s; }
 .app-tile:hover {
-  border-color: var(--border);
-  background: var(--surface-2);
+  border-color: #ffffff;
+  background: #ffffff;
 }
-.app-tile:active { opacity: .8; }
+.app-tile:hover .tile-label { color: #000000; }
+.app-tile:hover .tile-icon { border-color: #000000; }
+.app-tile:hover .tile-svg-icon { filter: brightness(0); }
+.app-tile:active { transform: scale(.97); }
 .app-tile.locked {
   opacity: .25;
   pointer-events: none;
@@ -1694,7 +1725,7 @@ input::placeholder { color: var(--border-sub); }
 .bt-cat-name { font-size: 16px; font-weight: 700; flex: 1; }
 .bt-cat-meta { font-size: 14px; color: var(--muted); flex-shrink: 0; }
 .bt-cat-spent { font-weight: 700; color: var(--text); }
-.bt-cat-spent.over, .bt-cat-remaining.over, .bt-var-remaining.over, over { color: var(--expense); }
+.bt-cat-spent.over, .bt-cat-remaining.over, .bt-var-remaining.over { color: var(--expense); }
 .bt-cat-sep { color: var(--border-sub); }
 .bt-cat-alloc { color: var(--muted); }
 .bt-cat-remaining {
@@ -2401,8 +2432,9 @@ input::placeholder { color: var(--border-sub); }
 }
 #incomeCol  .add-cat-form .btn-primary:hover,
 #expenseCol .add-cat-form .btn-primary:hover {
-  background: var(--muted);
-  border-color: var(--muted);
+  background: var(--bg);
+  border-color: var(--text);
+  color: var(--text);
 }
 
 /* ════════════════════════════════════════════
@@ -2493,7 +2525,7 @@ input::placeholder { color: var(--border-sub); }
 @media (max-width: 600px) {
   .stats-view { padding: 20px 16px; }
   .stats-header { margin-bottom: 20px; padding-bottom: 16px; }
-  .stats-header-total { font-size: 32px; }
+  .stats-header-val { font-size: 26px; }
   .stats-grid { grid-template-columns: 1fr; gap: 12px; }
   .stats-cat-top { padding: 16px 16px 0; }
   .stats-cat-sub { padding: 4px 16px 12px; }
@@ -2630,3 +2662,75 @@ input::placeholder { color: var(--border-sub); }
   padding-left: 12px;
 }
 .onboarding-page-cta { width: 100%; font-size: 16px; padding: 16px; }
+
+/* ════════════════════════════════════════════
+   MOTION & MICRO-INTERACTIONS
+   backwards fill only — elements land in their
+   natural state so :hover/:active transforms
+   still apply after the entrance finishes
+════════════════════════════════════════════ */
+@keyframes fadeUp  { from { opacity: 0; transform: translateY(14px); } }
+@keyframes barGrow { from { transform: scaleX(0); } }
+
+/* Landing page — staggered reveal */
+.landing-wrap > * { animation: fadeUp .45s ease backwards; }
+.landing-wrap > *:nth-child(2) { animation-delay: .06s; }
+.landing-wrap > *:nth-child(3) { animation-delay: .12s; }
+.landing-wrap > *:nth-child(4) { animation-delay: .18s; }
+.apps-row .app-tile { animation: fadeUp .4s ease backwards; }
+.apps-row .app-tile:nth-child(1) { animation-delay: .16s; }
+.apps-row .app-tile:nth-child(2) { animation-delay: .22s; }
+.apps-row .app-tile:nth-child(3) { animation-delay: .28s; }
+.apps-row .app-tile:nth-child(4) { animation-delay: .34s; }
+
+/* Login page */
+.login-brand { animation: fadeUp .45s ease backwards; }
+.login-card  { animation: fadeUp .45s ease .1s backwards; }
+
+/* Hub grids — cards cascade in */
+.hub-grid > * { animation: fadeUp .3s ease backwards; }
+.hub-grid > *:nth-child(2) { animation-delay: .05s; }
+.hub-grid > *:nth-child(3) { animation-delay: .1s; }
+.hub-grid > *:nth-child(4) { animation-delay: .15s; }
+.hub-grid > *:nth-child(5) { animation-delay: .2s; }
+.hub-grid > *:nth-child(n+6) { animation-delay: .25s; }
+
+/* Headline numbers settle in */
+.col-total,
+.remaining-amt,
+.stats-header-val,
+.sp-detail-hero-amount { animation: fadeUp .35s ease backwards; }
+
+/* Progress bars grow from the left */
+.sp-goal-bar-fill,
+.sp-detail-bar-fill,
+.bt-bar-fill {
+  transform-origin: left;
+  animation: barGrow .5s ease backwards;
+}
+
+/* Arrows nudge toward where they point */
+.nav-back { transition: color .15s, transform .15s; }
+.nav-back:hover { transform: translateX(-3px); }
+.quick-budget-arrow { transition: transform .15s; }
+.quick-budget-btn:hover .quick-budget-arrow { transform: translateX(4px); }
+.bt-cat-nav-arrow { transition: transform .15s, color .15s; }
+.bt-cat-card-wrap:hover .bt-cat-nav-arrow { transform: translateX(3px); }
+
+/* Universal press feedback */
+.btn:active,
+.hca-btn:active,
+.add-cat-btn:active,
+.tab-chip:active { transform: scale(.98); }
+
+/* Hub cards lift slightly on hover */
+.hub-card { transition: border-color .15s, transform .15s; }
+.hub-card:hover { transform: translateY(-2px); }
+
+/* Brand mark inverts on hover — outline box with white text */
+.brand-mark { transition: background .2s, color .2s, box-shadow .2s; }
+.login-brand:hover .brand-mark {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 2px #ffffff;
+}
